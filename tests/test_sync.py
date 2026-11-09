@@ -1,4 +1,5 @@
 import copy
+import base64
 import json
 import os
 import tempfile
@@ -20,8 +21,9 @@ def fixture(label):
     return sync.Shop(**data)
 
 
-def response(data, status=200, headers=None):
-    return Mock(status_code=status, headers=headers or {}, json=Mock(return_value=data))
+def response(data, status=200, headers=None, text=None):
+    return Mock(status_code=status, headers=headers or {}, json=Mock(return_value=data),
+                text=json.dumps(data) if text is None else text)
 
 
 class ComparisonTest(unittest.TestCase):
@@ -158,19 +160,133 @@ class ApiTest(unittest.TestCase):
         with self.assertRaisesRegex(sync.AuditError, 'HTTP 200, onvolledig'):
             sync.validate_product({'id': 1, 'sku': 'X'}, 'NL')
 
+    def test_tax_fallback_401_403_for_both_countries(self):
+        for country in ('NL', 'DE'):
+            for status in (401, 403):
+                for value in ('yes', 'no'):
+                    with self.subTest(country=country, status=status, value=value), \
+                         patch.dict(os.environ, {country + '_PRICES_INCLUDE_TAX': value}):
+                        fake = Mock(base='https://shop.example.invalid')
+                        fake.get.side_effect = sync.AuditError('settings forbidden', status_code=status)
+                        fake.pages.side_effect = [[{'country': country, 'rate': '21' if country == 'NL' else '19'}], []]
+                        shop = sync.load_shop(fake, country)
+                        self.assertEqual(shop.includes_tax, value == 'yes')
+                        self.assertEqual(fake.pages.call_count, 2)
+
+    def test_tax_fallback_not_used_on_other_errors_or_api_success(self):
+        fake = Mock(base='https://shop.example.invalid')
+        with patch.dict(os.environ, {'NL_PRICES_INCLUDE_TAX': 'no'}):
+            for status in (404, 429, 500, None):
+                fake.get.side_effect = sync.AuditError('failed', status_code=status)
+                with self.assertRaises(sync.AuditError):
+                    sync.load_shop(fake, 'NL')
+            fake.get.side_effect = None
+            fake.get.return_value = ({'value': 'yes'}, {})
+            fake.pages.side_effect = [[{'country': 'NL', 'rate': '21'}], []]
+            self.assertTrue(sync.load_shop(fake, 'NL').includes_tax)
+
+    def test_tax_fallback_requires_explicit_yes_no(self):
+        for value in ('', 'true', 'YES'):
+            with patch.dict(os.environ, {'NL_PRICES_INCLUDE_TAX': value}):
+                fake = Mock()
+                fake.get.side_effect = sync.AuditError('forbidden', status_code=403)
+                with self.assertRaisesRegex(sync.AuditError, 'HTTP 403; NL_PRICES_INCLUDE_TAX moet yes/no'):
+                    sync.load_shop(fake, 'NL')
+
+    def test_http_body_html_json_and_each_retry_logged_safely(self):
+        auth = base64.b64encode(b'fake-key:fake-secret').decode()
+        body = '<html>Cloudflare fake-key fake-secret ' + auth + '\n</html>'
+        self.session.get.side_effect = [response({}, 503, text=body),
+                                        response({}, 403, text='{"code":"woocommerce_rest_cannot_view","key":"fake-key"}')]
+        with self.assertLogs('fv_sync', level='WARNING') as captured, self.assertRaises(sync.AuditError):
+            self.client.get('products')
+        log = '\n'.join(captured.output)
+        self.assertIn('<html>Cloudflare', log)
+        self.assertIn('woocommerce_rest_cannot_view', log)
+        self.assertEqual(len(captured.output), 2)
+        for value in ('fake-key', 'fake-secret', auth):
+            self.assertNotIn(value, log)
+        self.assertEqual(sync.safe_response('X' * 400, 'fake-key', 'fake-secret'), 'X' * 300)
+        self.assertNotIn('fake-secret', sync.safe_response('X' * 295 + 'fake-secret', 'fake-key', 'fake-secret'))
+
+    def test_http_body_redacts_encoded_and_other_shop_secrets(self):
+        from urllib.parse import quote
+        with patch.dict(os.environ, {'DE_SECRET': 'secret+other/value'}):
+            body = quote('secret+other/value', safe='') + ' ck_unknown123 cs_unknown456'
+            result = sync.safe_response(body, 'fake-key', 'fake-secret')
+        self.assertNotIn('other', result)
+        self.assertNotIn('ck_', result)
+        self.assertNotIn('cs_', result)
+
     def test_failed_shop_sends_http_alert_without_false_missing(self):
         sent = []
         env = {k: 'fake' for k in ['NL_KEY', 'NL_SECRET', 'DE_KEY', 'DE_SECRET', 'SMTP_PASS']}
         env.update(NL_URL='https://nl.example.invalid', DE_URL='https://de.example.invalid',
                    SMTP_HOST='smtp.example.invalid', SMTP_PORT='465', SMTP_USER='from@example.invalid', MAIL_TO='to@example.invalid')
-        with patch.dict(os.environ, env), patch('sys.argv', ['fv_sync.py']), \
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.dict(os.environ, env | {'GITHUB_STEP_SUMMARY': str(Path(tmp) / 'job.md')}), \
+             patch('sys.argv', ['fv_sync.py', '--output-dir', tmp]), \
              patch('fv_sync.load_shop', side_effect=[sync.AuditError('NL products: HTTP 503'), fixture('de')]), \
              patch('fv_sync.smtplib.SMTP_SSL') as smtp:
             smtp.return_value.__enter__.return_value.send_message.side_effect = sent.append
-            self.assertEqual(sync.main(), 1)
+            self.assertEqual(sync.main(), 2)
+            self.assertIn('HTTP 503', (Path(tmp) / 'job.md').read_text(encoding='utf-8'))
+            self.assertIn('HTTP 503', (Path(tmp) / 'fv-sync.csv').read_text(encoding='utf-8-sig'))
         self.assertEqual(len(sent), 1)
         self.assertIn('HTTP 503', sent[0].get_body(preferencelist=('plain',)).get_content())
         self.assertNotIn('ontbreekt', sent[0].get_body(preferencelist=('plain',)).get_content())
+
+
+class ReportingTest(unittest.TestCase):
+    def run_main(self, shops, env=None, mail_error=None):
+        credentials = {key: 'fake' for key in ('NL_KEY', 'NL_SECRET', 'DE_KEY', 'DE_SECRET')}
+        credentials.update(NL_URL='https://nl.example.invalid', DE_URL='https://de.example.invalid')
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.dict(os.environ, credentials | (env or {}) | {'GITHUB_STEP_SUMMARY': str(Path(tmp) / 'job.md')}, clear=True), \
+             patch('sys.argv', ['fv_sync.py', '--output-dir', tmp]), \
+             patch('fv_sync.load_shop', side_effect=shops), \
+             patch('fv_sync.smtplib.SMTP_SSL') as smtp, patch('fv_sync.smtplib.SMTP') as starttls:
+            if mail_error:
+                smtp.side_effect = mail_error
+            result = sync.main()
+            return (result, (Path(tmp) / 'job.md').read_text(encoding='utf-8'),
+                    (Path(tmp) / 'fv-sync.csv').read_text(encoding='utf-8-sig'),
+                    smtp.call_count + starttls.call_count)
+
+    def test_no_mail_equal_exit_zero_and_summary_csv(self):
+        a, b = fixture('nl'), fixture('de')
+        a.products, b.products = a.products[:1], b.products[:1]
+        code, summary, csv, calls = self.run_main([a, b])
+        self.assertEqual(code, 0)
+        self.assertIn('alles gelijk', summary)
+        self.assertEqual(len(csv.splitlines()), 1)
+        self.assertEqual(calls, 0)
+
+    def test_differences_exit_one_without_or_with_partial_mail_config(self):
+        for env in ({}, {'SMTP_HOST': 'smtp.example.invalid', 'SMTP_PORT': '465', 'SMTP_USER': 'a@b.invalid', 'SMTP_PASS': 'fake'}):
+            code, summary, csv, calls = self.run_main([fixture('nl'), fixture('de')], env)
+            self.assertEqual(code, 1)
+            self.assertIn('PRIJS', summary)
+            self.assertIn('PRIJS', csv)
+            self.assertEqual(calls, 0)  # Missing MAIL_TO also disables mail
+
+    def test_smtp_failure_still_writes_reports_and_exit_two(self):
+        env = dict(SMTP_HOST='smtp.example.invalid', SMTP_PORT='465', SMTP_USER='a@b.invalid', SMTP_PASS='fake', MAIL_TO='c@d.invalid')
+        code, summary, csv, calls = self.run_main([fixture('nl'), fixture('de')], env, OSError('private details'))
+        self.assertEqual(code, 2)
+        self.assertIn('Mail versturen mislukt', summary)
+        self.assertIn('Mail versturen mislukt', csv)
+        self.assertNotIn('private details', summary)
+        self.assertEqual(calls, 1)
+
+    def test_summary_attempted_when_csv_cannot_be_written(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / 'fv-sync.csv').mkdir()
+            summary = directory / 'job.md'
+            with patch.dict(os.environ, {'GITHUB_STEP_SUMMARY': str(summary)}):
+                self.assertFalse(sync.save_report([], directory))
+            self.assertIn('alles gelijk', summary.read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

@@ -1,10 +1,13 @@
 """Read-only WooCommerce audit. Only requests is an external dependency."""
 import argparse
+import base64
 import csv
 import html
 import io
+import json
 import logging
 import os
+import re
 import smtplib
 import ssl
 import time
@@ -14,7 +17,8 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from email.message import EmailMessage
 from email.utils import parsedate_to_datetime
-from urllib.parse import urlsplit
+from pathlib import Path
+from urllib.parse import urlsplit, quote, quote_plus
 
 import requests
 
@@ -30,7 +34,24 @@ COLUMNS = ["sectie", "SKU", "productnaam", "veld", "waarde_NL", "waarde_DE",
 
 
 class AuditError(Exception):
-    pass
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def safe_response(text, key, secret):
+    """Redact before truncating, including echoed URL/Basic-auth representations."""
+    values = {key, secret, *(os.environ.get(name, "") for name in
+              ("NL_KEY", "NL_SECRET", "DE_KEY", "DE_SECRET", "SMTP_PASS"))}
+    values.add(base64.b64encode(f"{key}:{secret}".encode()).decode())
+    variants = set()
+    for value in values - {""}:
+        variants.update((value, quote(value, safe=""), quote_plus(value),
+                         json.dumps(value)[1:-1]))
+    for value in sorted(variants, key=len, reverse=True):
+        text = text.replace(value, "[AFGESCHERMD]")
+    text = re.sub(r"\b(?:ck|cs)_[a-zA-Z0-9]+", "[AFGESCHERMD]", text)
+    return text[:300]
 
 
 def base_url(value):
@@ -48,11 +69,13 @@ class Client:
         self.label, self.base = label, base_url(url)
         self.session = session or requests.Session()
         self.session.auth = (key, secret)
+        self.key, self.secret = key, secret
         self.last_request = 0.0
 
     def get(self, endpoint, params=None):
         """Only GET; no redirects, no credentials in query strings or logs."""
         status = "geen HTTP-respons"
+        status_code = None
         for attempt in range(4):
             time.sleep(max(0, 0.5 - (time.monotonic() - self.last_request)))
             self.last_request = time.monotonic()
@@ -60,13 +83,18 @@ class Client:
                 response = self.session.get(self.base + "/wp-json/wc/v3/" + endpoint,
                                             params=params, timeout=(10, 60), allow_redirects=False)
             except requests.RequestException:
+                status_code = None
                 status = "geen HTTP-respons (netwerk/TLS/timeout)"
                 if attempt < 3:
                     time.sleep(2 ** attempt)
                     continue
                 break
             status = "HTTP " + str(response.status_code)
+            status_code = response.status_code
             LOG.info("%s GET %s %s", self.label, endpoint, status)
+            if response.status_code != 200:
+                LOG.warning("%s GET %s %s response=%r", self.label, endpoint, status,
+                            safe_response(response.text, self.key, self.secret))
             if response.status_code == 429 or 500 <= response.status_code < 600:
                 if attempt < 3:
                     retry = response.headers.get("Retry-After", "")
@@ -85,7 +113,7 @@ class Client:
                 return response.json(), response.headers
             except ValueError:
                 raise AuditError(f"{self.label} {endpoint}: HTTP 200, ongeldige JSON") from None
-        raise AuditError(f"{self.label} {endpoint}: {status}")
+        raise AuditError(f"{self.label} {endpoint}: {status}", status_code=status_code)
 
     def pages(self, endpoint, **params):
         result = []
@@ -123,7 +151,17 @@ def standard_rate(rates, country):
 
 
 def load_shop(client, country):
-    setting, _ = client.get("settings/tax/woocommerce_prices_include_tax")
+    try:
+        setting, _ = client.get("settings/tax/woocommerce_prices_include_tax")
+    except AuditError as error:
+        if error.status_code not in (401, 403):
+            raise
+        name = country + "_PRICES_INCLUDE_TAX"
+        value = os.environ.get(name, "").strip()
+        if value not in ("yes", "no"):
+            raise AuditError(f"{country} settings/tax: HTTP {error.status_code}; {name} moet yes/no zijn") from None
+        LOG.warning("%s settings/tax HTTP %s: gebruik %s=%s", country, error.status_code, name, value)
+        setting = {"value": value}
     if not isinstance(setting, dict) or setting.get("value") not in ("yes", "no"):
         raise AuditError(f"{country}: woocommerce_prices_include_tax ontbreekt/is ongeldig")
     rate = standard_rate(client.pages("taxes", **{"class": "standard"}), country)
@@ -337,9 +375,60 @@ def required(name):
     return value
 
 
+def save_report(rows, output_dir):
+    """Attempt CSV, local summary and GitHub Summary independently, even on errors."""
+    summary = f"## FV sync NL↔DE – {amsterdam_date()} – {discrepancy_count(rows)} afwijkingen\n\n"
+    summary += html_report(rows).removeprefix("<html><body>").removesuffix("</body></html>") + "\n"
+    directory = Path(output_dir)
+    ok = True
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        LOG.error("Rapportmap maken mislukt")
+        ok = False
+    for path, content, encoding, mode in (
+        (directory / "fv-sync.csv", csv_report(rows), "utf-8-sig", "w"),
+        (directory / "summary.md", summary, "utf-8", "w"),
+        (os.environ.get("GITHUB_STEP_SUMMARY"), summary, "utf-8", "a"),
+    ):
+        if not path:
+            continue
+        try:
+            with open(path, mode, encoding=encoding, newline="") as handle:
+                handle.write(content)
+        except OSError:
+            LOG.error("Rapportbestand schrijven mislukt (%s)", "Job Summary" if mode == "a" else "lokaal")
+            ok = False
+    return ok
+
+
+def send_mail(rows):
+    names = ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "MAIL_TO")
+    if not all(os.environ.get(name, "").strip() for name in names):
+        LOG.info("Mail overgeslagen: SMTP-configuratie/MAIL_TO niet volledig gevuld")
+        return
+    user, recipient = required("SMTP_USER"), required("MAIL_TO")
+    msg = message(rows, user, recipient)
+    host, port, password = required("SMTP_HOST"), int(required("SMTP_PORT")), required("SMTP_PASS")
+    context = ssl.create_default_context()
+    if port == 465:
+        with smtplib.SMTP_SSL(host, port, context=context, timeout=60) as smtp:
+            smtp.login(user, password)
+            smtp.send_message(msg)
+    else:
+        with smtplib.SMTP(host, port, timeout=60) as smtp:
+            smtp.ehlo()
+            smtp.starttls(context=context)
+            smtp.ehlo()
+            smtp.login(user, password)
+            smtp.send_message(msg)
+    LOG.info("Rapport verstuurd: %d afwijkingen", discrepancy_count(rows))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--exceptions", default="exceptions.csv")
+    parser.add_argument("--output-dir", default="outputs")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     rows, shops = [], {}
@@ -355,7 +444,7 @@ def main():
             LOG.info("%s: %d records; prijzen inclusief btw=%s; tarief=%s%%", country,
                      len(shops[country].products), shops[country].includes_tax, shops[country].rate)
         except (AuditError, ValueError, KeyError, TypeError) as error:
-            # Do not log requests exception strings, bodies or authentication details.
+            # HTTP bodies are logged only via safe_response; never log exception details here.
             LOG.error("%s uitlezen mislukt", country)
             rows.append(row("api_error", name="Shop niet volledig uitgelezen",
                             nl=str(error) if country == "NL" else "",
@@ -364,26 +453,14 @@ def main():
         rows.extend(compare(shops["NL"], shops["DE"], exceptions))
     rows.sort(key=lambda r: (PRIORITY[r["veld"]], r["SKU"], r["veld"]))
     try:
-        user, recipient = required("SMTP_USER"), required("MAIL_TO")
-        msg = message(rows, user, recipient)
-        host, port, password = required("SMTP_HOST"), int(required("SMTP_PORT")), required("SMTP_PASS")
-        context = ssl.create_default_context()
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, context=context, timeout=60) as smtp:
-                smtp.login(user, password)
-                smtp.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=60) as smtp:
-                smtp.ehlo()
-                smtp.starttls(context=context)
-                smtp.ehlo()
-                smtp.login(user, password)
-                smtp.send_message(msg)
-        LOG.info("Rapport verstuurd: %d afwijkingen", discrepancy_count(rows))
+        send_mail(rows)
     except (AuditError, ValueError, OSError, smtplib.SMTPException):
         LOG.error("Mail versturen mislukt; controleer SMTP-secrets en provider (details afgeschermd)")
+        rows.insert(0, row("data_error", name="Mail versturen mislukt", nl="Controleer SMTP-configuratie/provider"))
+    saved = save_report(rows, args.output_dir)
+    if not saved or any(r["veld"] in ("api_error", "data_error") for r in rows):
         return 2
-    return 1 if any(r["veld"] in ("api_error", "data_error") for r in rows) else 0
+    return 1 if discrepancy_count(rows) else 0
 
 
 if __name__ == "__main__":

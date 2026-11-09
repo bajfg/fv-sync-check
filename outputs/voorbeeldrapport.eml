@@ -1,0 +1,205 @@
+Subject: FV sync =?utf-8?b?TkzihpRERSDigJMgMjAyNi0xMS0wOSDigJM=?= 15
+ afwijkingen
+From: rapport@example.invalid
+To: ontvanger@example.invalid
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============3737723530397206683=="
+
+--===============3737723530397206683==
+Content-Type: multipart/alternative;
+ boundary="===============1999817179349667176=="
+
+--===============1999817179349667176==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+ACTIEPRIJS | Voorbeeld ACTIEPRIJS | sale_price | NL: 96.80 | DE: 98.00 | http=
+s://nl.example.invalid/wp-admin/post.php?post=3D3&action=3Dedit | https://de.=
+example.invalid/wp-admin/post.php?post=3D103&action=3Dedit
+BEWUST | Voorbeeld BEWUST | regular_price | NL: 121.00 | DE: 130.00 | https:/=
+/nl.example.invalid/wp-admin/post.php?post=3D13&action=3Dedit | https://de.ex=
+ample.invalid/wp-admin/post.php?post=3D113&action=3Dedit
+LEEG-VS-NUL | Voorbeeld LEEG-VS-NUL | sale_price | NL: 0.00 | DE: leeg | http=
+s://nl.example.invalid/wp-admin/post.php?post=3D15&action=3Dedit | https://de=
+.example.invalid/wp-admin/post.php?post=3D115&action=3Dedit
+PRIJS | Voorbeeld PRIJS | regular_price | NL: 121.00 | DE: 125.00 | https://n=
+l.example.invalid/wp-admin/post.php?post=3D2&action=3Dedit | https://de.examp=
+le.invalid/wp-admin/post.php?post=3D102&action=3Dedit
+VAR-ROOD | Voorbeeld VAR-ROOD | regular_price | NL: 121.00 | DE: 124.00 | htt=
+ps://nl.example.invalid/wp-admin/post.php?post=3D9&action=3Dedit#variable_pro=
+duct_options | https://de.example.invalid/wp-admin/post.php?post=3D109&action=
+=3Dedit#variable_product_options
+ALLEEN-DE | Voorbeeld ALLEEN-DE | exists | NL: ontbreekt | DE: aanwezig |  | =
+https://de.example.invalid/wp-admin/post.php?post=3D104&action=3Dedit
+ALLEEN-NL | Voorbeeld ALLEEN-NL | exists | NL: aanwezig | DE: ontbreekt | htt=
+ps://nl.example.invalid/wp-admin/post.php?post=3D4&action=3Dedit |=20
+VAR-BLAUW | Voorbeeld VAR-BLAUW | exists | NL: aanwezig | DE: ontbreekt | htt=
+ps://nl.example.invalid/wp-admin/post.php?post=3D9&action=3Dedit#variable_pro=
+duct_options |=20
+STATUS | Voorbeeld STATUS | status | NL: publish | DE: draft | https://nl.exa=
+mple.invalid/wp-admin/post.php?post=3D5&action=3Dedit | https://de.example.in=
+valid/wp-admin/post.php?post=3D105&action=3Dedit
+VOORRAAD | Voorbeeld VOORRAAD | stock_status | NL: instock | DE: outofstock |=
+ https://nl.example.invalid/wp-admin/post.php?post=3D6&action=3Dedit | https:=
+//de.example.invalid/wp-admin/post.php?post=3D106&action=3Dedit
+ACTIE-TOT | Voorbeeld ACTIE-TOT | date_on_sale_to | NL: 2026-11-30T23:59:59 |=
+ DE: 2026-12-01T23:59:59 | https://nl.example.invalid/wp-admin/post.php?post=
+=3D8&action=3Dedit | https://de.example.invalid/wp-admin/post.php?post=3D108&=
+action=3Dedit
+ACTIE-VAN | Voorbeeld ACTIE-VAN | date_on_sale_from | NL: 2026-11-09T23:00:00=
++00:00 | DE: 2026-11-10T23:00:00+00:00 | https://nl.example.invalid/wp-admin/=
+post.php?post=3D7&action=3Dedit | https://de.example.invalid/wp-admin/post.ph=
+p?post=3D107&action=3Dedit
+VARIABEL | Voorbeeld VARIABEL | variation_count | NL: 2 | DE: 1 | https://nl.=
+example.invalid/wp-admin/post.php?post=3D9&action=3Dedit | https://de.example=
+.invalid/wp-admin/post.php?post=3D109&action=3Dedit
+ | Voorbeeld zonder SKU | missing_sku | NL: ID 12 | DE:  | https://nl.example=
+.invalid/wp-admin/post.php?post=3D12&action=3Dedit |=20
+ | Voorbeeld zonder SKU | missing_sku | NL:  | DE: ID 112 |  | https://de.exa=
+mple.invalid/wp-admin/post.php?post=3D112&action=3Dedit
+DUBBEL | Voorbeeld DUBBEL | duplicate_sku | NL: 16,17 | DE: 116 | https://nl.=
+example.invalid/wp-admin/post.php?post=3D16&action=3Dedit | https://de.exampl=
+e.invalid/wp-admin/post.php?post=3D116&action=3Dedit
+
+--===============1999817179349667176==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+<html><body><table border=3D'1' cellpadding=3D'6' cellspacing=3D'0'><tr><th>S=
+KU</th><th>Productnaam</th><th>Veld</th><th>Waarde NL</th><th>Waarde DE</th><=
+th>Bewerken NL</th><th>Bewerken DE</th><th>Reden</th></tr><tr><td>ACTIEPRIJS<=
+/td><td>Voorbeeld ACTIEPRIJS</td><td>sale_price</td><td>96.80</td><td>98.00</=
+td><td><a href=3D"https://nl.example.invalid/wp-admin/post.php?post=3D3&amp;a=
+ction=3Dedit">bewerken</a></td><td><a href=3D"https://de.example.invalid/wp-a=
+dmin/post.php?post=3D103&amp;action=3Dedit">bewerken</a></td><td></td></tr><t=
+r><td>LEEG-VS-NUL</td><td>Voorbeeld LEEG-VS-NUL</td><td>sale_price</td><td>0.=
+00</td><td>leeg</td><td><a href=3D"https://nl.example.invalid/wp-admin/post.p=
+hp?post=3D15&amp;action=3Dedit">bewerken</a></td><td><a href=3D"https://de.ex=
+ample.invalid/wp-admin/post.php?post=3D115&amp;action=3Dedit">bewerken</a></t=
+d><td></td></tr><tr><td>PRIJS</td><td>Voorbeeld PRIJS</td><td>regular_price</=
+td><td>121.00</td><td>125.00</td><td><a href=3D"https://nl.example.invalid/wp=
+-admin/post.php?post=3D2&amp;action=3Dedit">bewerken</a></td><td><a href=3D"h=
+ttps://de.example.invalid/wp-admin/post.php?post=3D102&amp;action=3Dedit">bew=
+erken</a></td><td></td></tr><tr><td>VAR-ROOD</td><td>Voorbeeld VAR-ROOD</td><=
+td>regular_price</td><td>121.00</td><td>124.00</td><td><a href=3D"https://nl.=
+example.invalid/wp-admin/post.php?post=3D9&amp;action=3Dedit#variable_product=
+_options">bewerken</a></td><td><a href=3D"https://de.example.invalid/wp-admin=
+/post.php?post=3D109&amp;action=3Dedit#variable_product_options">bewerken</a>=
+</td><td></td></tr><tr><td>ALLEEN-DE</td><td>Voorbeeld ALLEEN-DE</td><td>exis=
+ts</td><td>ontbreekt</td><td>aanwezig</td><td></td><td><a href=3D"https://de.=
+example.invalid/wp-admin/post.php?post=3D104&amp;action=3Dedit">bewerken</a><=
+/td><td></td></tr><tr><td>ALLEEN-NL</td><td>Voorbeeld ALLEEN-NL</td><td>exist=
+s</td><td>aanwezig</td><td>ontbreekt</td><td><a href=3D"https://nl.example.in=
+valid/wp-admin/post.php?post=3D4&amp;action=3Dedit">bewerken</a></td><td></td=
+><td></td></tr><tr><td>VAR-BLAUW</td><td>Voorbeeld VAR-BLAUW</td><td>exists</=
+td><td>aanwezig</td><td>ontbreekt</td><td><a href=3D"https://nl.example.inval=
+id/wp-admin/post.php?post=3D9&amp;action=3Dedit#variable_product_options">bew=
+erken</a></td><td></td><td></td></tr><tr><td>STATUS</td><td>Voorbeeld STATUS<=
+/td><td>status</td><td>publish</td><td>draft</td><td><a href=3D"https://nl.ex=
+ample.invalid/wp-admin/post.php?post=3D5&amp;action=3Dedit">bewerken</a></td>=
+<td><a href=3D"https://de.example.invalid/wp-admin/post.php?post=3D105&amp;ac=
+tion=3Dedit">bewerken</a></td><td></td></tr><tr><td>VOORRAAD</td><td>Voorbeel=
+d VOORRAAD</td><td>stock_status</td><td>instock</td><td>outofstock</td><td><a=
+ href=3D"https://nl.example.invalid/wp-admin/post.php?post=3D6&amp;action=3De=
+dit">bewerken</a></td><td><a href=3D"https://de.example.invalid/wp-admin/post=
+.php?post=3D106&amp;action=3Dedit">bewerken</a></td><td></td></tr><tr><td>ACT=
+IE-TOT</td><td>Voorbeeld ACTIE-TOT</td><td>date_on_sale_to</td><td>2026-11-30=
+T23:59:59</td><td>2026-12-01T23:59:59</td><td><a href=3D"https://nl.example.i=
+nvalid/wp-admin/post.php?post=3D8&amp;action=3Dedit">bewerken</a></td><td><a =
+href=3D"https://de.example.invalid/wp-admin/post.php?post=3D108&amp;action=3D=
+edit">bewerken</a></td><td></td></tr><tr><td>ACTIE-VAN</td><td>Voorbeeld ACTI=
+E-VAN</td><td>date_on_sale_from</td><td>2026-11-09T23:00:00+00:00</td><td>202=
+6-11-10T23:00:00+00:00</td><td><a href=3D"https://nl.example.invalid/wp-admin=
+/post.php?post=3D7&amp;action=3Dedit">bewerken</a></td><td><a href=3D"https:/=
+/de.example.invalid/wp-admin/post.php?post=3D107&amp;action=3Dedit">bewerken<=
+/a></td><td></td></tr><tr><td>VARIABEL</td><td>Voorbeeld VARIABEL</td><td>var=
+iation_count</td><td>2</td><td>1</td><td><a href=3D"https://nl.example.invali=
+d/wp-admin/post.php?post=3D9&amp;action=3Dedit">bewerken</a></td><td><a href=
+=3D"https://de.example.invalid/wp-admin/post.php?post=3D109&amp;action=3Dedit=
+">bewerken</a></td><td></td></tr><tr><td>DUBBEL</td><td>Voorbeeld DUBBEL</td>=
+<td>duplicate_sku</td><td>16,17</td><td>116</td><td><a href=3D"https://nl.exa=
+mple.invalid/wp-admin/post.php?post=3D16&amp;action=3Dedit">bewerken</a></td>=
+<td><a href=3D"https://de.example.invalid/wp-admin/post.php?post=3D116&amp;ac=
+tion=3Dedit">bewerken</a></td><td></td></tr></table><h2>zonder SKU</h2><table=
+ border=3D'1' cellpadding=3D'6' cellspacing=3D'0'><tr><th>SKU</th><th>Product=
+naam</th><th>Veld</th><th>Waarde NL</th><th>Waarde DE</th><th>Bewerken NL</th=
+><th>Bewerken DE</th><th>Reden</th></tr><tr><td></td><td>Voorbeeld zonder SKU=
+</td><td>missing_sku</td><td>ID 12</td><td></td><td><a href=3D"https://nl.exa=
+mple.invalid/wp-admin/post.php?post=3D12&amp;action=3Dedit">bewerken</a></td>=
+<td></td><td></td></tr><tr><td></td><td>Voorbeeld zonder SKU</td><td>missing_=
+sku</td><td></td><td>ID 112</td><td></td><td><a href=3D"https://de.example.in=
+valid/wp-admin/post.php?post=3D112&amp;action=3Dedit">bewerken</a></td><td></=
+td></tr></table><h2>uitzonderingen</h2><table border=3D'1' cellpadding=3D'6' =
+cellspacing=3D'0'><tr><th>SKU</th><th>Productnaam</th><th>Veld</th><th>Waarde=
+ NL</th><th>Waarde DE</th><th>Bewerken NL</th><th>Bewerken DE</th><th>Reden</=
+th></tr><tr><td>BEWUST</td><td>Voorbeeld BEWUST</td><td>regular_price</td><td=
+>121.00</td><td>130.00</td><td><a href=3D"https://nl.example.invalid/wp-admin=
+/post.php?post=3D13&amp;action=3Dedit">bewerken</a></td><td><a href=3D"https:=
+//de.example.invalid/wp-admin/post.php?post=3D113&amp;action=3Dedit">bewerken=
+</a></td><td>Lokale afspraak</td></tr></table></body></html>
+
+--===============1999817179349667176==--
+
+--===============3737723530397206683==
+Content-Type: text/csv
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="fv-sync-2026-11-09.csv"
+MIME-Version: 1.0
+
+77u/c2VjdGllLFNLVSxwcm9kdWN0bmFhbSx2ZWxkLHdhYXJkZV9OTCx3YWFyZGVfREUsYmV3ZXJr
+ZW5fTkwsYmV3ZXJrZW5fREUscmVkZW4NCmFmd2lqa2luZ2VuLEFDVElFUFJJSlMsVm9vcmJlZWxk
+IEFDVElFUFJJSlMsc2FsZV9wcmljZSw5Ni44MCw5OC4wMCxodHRwczovL25sLmV4YW1wbGUuaW52
+YWxpZC93cC1hZG1pbi9wb3N0LnBocD9wb3N0PTMmYWN0aW9uPWVkaXQsaHR0cHM6Ly9kZS5leGFt
+cGxlLmludmFsaWQvd3AtYWRtaW4vcG9zdC5waHA/cG9zdD0xMDMmYWN0aW9uPWVkaXQsDQp1aXR6
+b25kZXJpbmdlbixCRVdVU1QsVm9vcmJlZWxkIEJFV1VTVCxyZWd1bGFyX3ByaWNlLDEyMS4wMCwx
+MzAuMDAsaHR0cHM6Ly9ubC5leGFtcGxlLmludmFsaWQvd3AtYWRtaW4vcG9zdC5waHA/cG9zdD0x
+MyZhY3Rpb249ZWRpdCxodHRwczovL2RlLmV4YW1wbGUuaW52YWxpZC93cC1hZG1pbi9wb3N0LnBo
+cD9wb3N0PTExMyZhY3Rpb249ZWRpdCxMb2thbGUgYWZzcHJhYWsNCmFmd2lqa2luZ2VuLExFRUct
+VlMtTlVMLFZvb3JiZWVsZCBMRUVHLVZTLU5VTCxzYWxlX3ByaWNlLDAuMDAsbGVlZyxodHRwczov
+L25sLmV4YW1wbGUuaW52YWxpZC93cC1hZG1pbi9wb3N0LnBocD9wb3N0PTE1JmFjdGlvbj1lZGl0
+LGh0dHBzOi8vZGUuZXhhbXBsZS5pbnZhbGlkL3dwLWFkbWluL3Bvc3QucGhwP3Bvc3Q9MTE1JmFj
+dGlvbj1lZGl0LA0KYWZ3aWpraW5nZW4sUFJJSlMsVm9vcmJlZWxkIFBSSUpTLHJlZ3VsYXJfcHJp
+Y2UsMTIxLjAwLDEyNS4wMCxodHRwczovL25sLmV4YW1wbGUuaW52YWxpZC93cC1hZG1pbi9wb3N0
+LnBocD9wb3N0PTImYWN0aW9uPWVkaXQsaHR0cHM6Ly9kZS5leGFtcGxlLmludmFsaWQvd3AtYWRt
+aW4vcG9zdC5waHA/cG9zdD0xMDImYWN0aW9uPWVkaXQsDQphZndpamtpbmdlbixWQVItUk9PRCxW
+b29yYmVlbGQgVkFSLVJPT0QscmVndWxhcl9wcmljZSwxMjEuMDAsMTI0LjAwLGh0dHBzOi8vbmwu
+ZXhhbXBsZS5pbnZhbGlkL3dwLWFkbWluL3Bvc3QucGhwP3Bvc3Q9OSZhY3Rpb249ZWRpdCN2YXJp
+YWJsZV9wcm9kdWN0X29wdGlvbnMsaHR0cHM6Ly9kZS5leGFtcGxlLmludmFsaWQvd3AtYWRtaW4v
+cG9zdC5waHA/cG9zdD0xMDkmYWN0aW9uPWVkaXQjdmFyaWFibGVfcHJvZHVjdF9vcHRpb25zLA0K
+YWZ3aWpraW5nZW4sQUxMRUVOLURFLFZvb3JiZWVsZCBBTExFRU4tREUsZXhpc3RzLG9udGJyZWVr
+dCxhYW53ZXppZywsaHR0cHM6Ly9kZS5leGFtcGxlLmludmFsaWQvd3AtYWRtaW4vcG9zdC5waHA/
+cG9zdD0xMDQmYWN0aW9uPWVkaXQsDQphZndpamtpbmdlbixBTExFRU4tTkwsVm9vcmJlZWxkIEFM
+TEVFTi1OTCxleGlzdHMsYWFud2V6aWcsb250YnJlZWt0LGh0dHBzOi8vbmwuZXhhbXBsZS5pbnZh
+bGlkL3dwLWFkbWluL3Bvc3QucGhwP3Bvc3Q9NCZhY3Rpb249ZWRpdCwsDQphZndpamtpbmdlbixW
+QVItQkxBVVcsVm9vcmJlZWxkIFZBUi1CTEFVVyxleGlzdHMsYWFud2V6aWcsb250YnJlZWt0LGh0
+dHBzOi8vbmwuZXhhbXBsZS5pbnZhbGlkL3dwLWFkbWluL3Bvc3QucGhwP3Bvc3Q9OSZhY3Rpb249
+ZWRpdCN2YXJpYWJsZV9wcm9kdWN0X29wdGlvbnMsLA0KYWZ3aWpraW5nZW4sU1RBVFVTLFZvb3Ji
+ZWVsZCBTVEFUVVMsc3RhdHVzLHB1Ymxpc2gsZHJhZnQsaHR0cHM6Ly9ubC5leGFtcGxlLmludmFs
+aWQvd3AtYWRtaW4vcG9zdC5waHA/cG9zdD01JmFjdGlvbj1lZGl0LGh0dHBzOi8vZGUuZXhhbXBs
+ZS5pbnZhbGlkL3dwLWFkbWluL3Bvc3QucGhwP3Bvc3Q9MTA1JmFjdGlvbj1lZGl0LA0KYWZ3aWpr
+aW5nZW4sVk9PUlJBQUQsVm9vcmJlZWxkIFZPT1JSQUFELHN0b2NrX3N0YXR1cyxpbnN0b2NrLG91
+dG9mc3RvY2ssaHR0cHM6Ly9ubC5leGFtcGxlLmludmFsaWQvd3AtYWRtaW4vcG9zdC5waHA/cG9z
+dD02JmFjdGlvbj1lZGl0LGh0dHBzOi8vZGUuZXhhbXBsZS5pbnZhbGlkL3dwLWFkbWluL3Bvc3Qu
+cGhwP3Bvc3Q9MTA2JmFjdGlvbj1lZGl0LA0KYWZ3aWpraW5nZW4sQUNUSUUtVE9ULFZvb3JiZWVs
+ZCBBQ1RJRS1UT1QsZGF0ZV9vbl9zYWxlX3RvLDIwMjYtMTEtMzBUMjM6NTk6NTksMjAyNi0xMi0w
+MVQyMzo1OTo1OSxodHRwczovL25sLmV4YW1wbGUuaW52YWxpZC93cC1hZG1pbi9wb3N0LnBocD9w
+b3N0PTgmYWN0aW9uPWVkaXQsaHR0cHM6Ly9kZS5leGFtcGxlLmludmFsaWQvd3AtYWRtaW4vcG9z
+dC5waHA/cG9zdD0xMDgmYWN0aW9uPWVkaXQsDQphZndpamtpbmdlbixBQ1RJRS1WQU4sVm9vcmJl
+ZWxkIEFDVElFLVZBTixkYXRlX29uX3NhbGVfZnJvbSwyMDI2LTExLTA5VDIzOjAwOjAwKzAwOjAw
+LDIwMjYtMTEtMTBUMjM6MDA6MDArMDA6MDAsaHR0cHM6Ly9ubC5leGFtcGxlLmludmFsaWQvd3At
+YWRtaW4vcG9zdC5waHA/cG9zdD03JmFjdGlvbj1lZGl0LGh0dHBzOi8vZGUuZXhhbXBsZS5pbnZh
+bGlkL3dwLWFkbWluL3Bvc3QucGhwP3Bvc3Q9MTA3JmFjdGlvbj1lZGl0LA0KYWZ3aWpraW5nZW4s
+VkFSSUFCRUwsVm9vcmJlZWxkIFZBUklBQkVMLHZhcmlhdGlvbl9jb3VudCwyLDEsaHR0cHM6Ly9u
+bC5leGFtcGxlLmludmFsaWQvd3AtYWRtaW4vcG9zdC5waHA/cG9zdD05JmFjdGlvbj1lZGl0LGh0
+dHBzOi8vZGUuZXhhbXBsZS5pbnZhbGlkL3dwLWFkbWluL3Bvc3QucGhwP3Bvc3Q9MTA5JmFjdGlv
+bj1lZGl0LA0Kem9uZGVyIFNLVSwsVm9vcmJlZWxkIHpvbmRlciBTS1UsbWlzc2luZ19za3UsSUQg
+MTIsLGh0dHBzOi8vbmwuZXhhbXBsZS5pbnZhbGlkL3dwLWFkbWluL3Bvc3QucGhwP3Bvc3Q9MTIm
+YWN0aW9uPWVkaXQsLA0Kem9uZGVyIFNLVSwsVm9vcmJlZWxkIHpvbmRlciBTS1UsbWlzc2luZ19z
+a3UsLElEIDExMiwsaHR0cHM6Ly9kZS5leGFtcGxlLmludmFsaWQvd3AtYWRtaW4vcG9zdC5waHA/
+cG9zdD0xMTImYWN0aW9uPWVkaXQsDQphZndpamtpbmdlbixEVUJCRUwsVm9vcmJlZWxkIERVQkJF
+TCxkdXBsaWNhdGVfc2t1LCIxNiwxNyIsMTE2LGh0dHBzOi8vbmwuZXhhbXBsZS5pbnZhbGlkL3dw
+LWFkbWluL3Bvc3QucGhwP3Bvc3Q9MTYmYWN0aW9uPWVkaXQsaHR0cHM6Ly9kZS5leGFtcGxlLmlu
+dmFsaWQvd3AtYWRtaW4vcG9zdC5waHA/cG9zdD0xMTYmYWN0aW9uPWVkaXQsDQo=
+
+--===============3737723530397206683==--

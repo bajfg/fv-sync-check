@@ -1,0 +1,17 @@
+﻿sectie,SKU,productnaam,veld,waarde_NL,waarde_DE,bewerken_NL,bewerken_DE,reden
+afwijkingen,ACTIEPRIJS,Voorbeeld ACTIEPRIJS,sale_price,96.80,98.00,https://nl.example.invalid/wp-admin/post.php?post=3&action=edit,https://de.example.invalid/wp-admin/post.php?post=103&action=edit,
+uitzonderingen,BEWUST,Voorbeeld BEWUST,regular_price,121.00,130.00,https://nl.example.invalid/wp-admin/post.php?post=13&action=edit,https://de.example.invalid/wp-admin/post.php?post=113&action=edit,Lokale afspraak
+afwijkingen,LEEG-VS-NUL,Voorbeeld LEEG-VS-NUL,sale_price,0.00,leeg,https://nl.example.invalid/wp-admin/post.php?post=15&action=edit,https://de.example.invalid/wp-admin/post.php?post=115&action=edit,
+afwijkingen,PRIJS,Voorbeeld PRIJS,regular_price,121.00,125.00,https://nl.example.invalid/wp-admin/post.php?post=2&action=edit,https://de.example.invalid/wp-admin/post.php?post=102&action=edit,
+afwijkingen,VAR-ROOD,Voorbeeld VAR-ROOD,regular_price,121.00,124.00,https://nl.example.invalid/wp-admin/post.php?post=9&action=edit#variable_product_options,https://de.example.invalid/wp-admin/post.php?post=109&action=edit#variable_product_options,
+afwijkingen,ALLEEN-DE,Voorbeeld ALLEEN-DE,exists,ontbreekt,aanwezig,,https://de.example.invalid/wp-admin/post.php?post=104&action=edit,
+afwijkingen,ALLEEN-NL,Voorbeeld ALLEEN-NL,exists,aanwezig,ontbreekt,https://nl.example.invalid/wp-admin/post.php?post=4&action=edit,,
+afwijkingen,VAR-BLAUW,Voorbeeld VAR-BLAUW,exists,aanwezig,ontbreekt,https://nl.example.invalid/wp-admin/post.php?post=9&action=edit#variable_product_options,,
+afwijkingen,STATUS,Voorbeeld STATUS,status,publish,draft,https://nl.example.invalid/wp-admin/post.php?post=5&action=edit,https://de.example.invalid/wp-admin/post.php?post=105&action=edit,
+afwijkingen,VOORRAAD,Voorbeeld VOORRAAD,stock_status,instock,outofstock,https://nl.example.invalid/wp-admin/post.php?post=6&action=edit,https://de.example.invalid/wp-admin/post.php?post=106&action=edit,
+afwijkingen,ACTIE-TOT,Voorbeeld ACTIE-TOT,date_on_sale_to,2026-11-30T23:59:59,2026-12-01T23:59:59,https://nl.example.invalid/wp-admin/post.php?post=8&action=edit,https://de.example.invalid/wp-admin/post.php?post=108&action=edit,
+afwijkingen,ACTIE-VAN,Voorbeeld ACTIE-VAN,date_on_sale_from,2026-11-09T23:00:00+00:00,2026-11-10T23:00:00+00:00,https://nl.example.invalid/wp-admin/post.php?post=7&action=edit,https://de.example.invalid/wp-admin/post.php?post=107&action=edit,
+afwijkingen,VARIABEL,Voorbeeld VARIABEL,variation_count,2,1,https://nl.example.invalid/wp-admin/post.php?post=9&action=edit,https://de.example.invalid/wp-admin/post.php?post=109&action=edit,
+zonder SKU,,Voorbeeld zonder SKU,missing_sku,ID 12,,https://nl.example.invalid/wp-admin/post.php?post=12&action=edit,,
+zonder SKU,,Voorbeeld zonder SKU,missing_sku,,ID 112,,https://de.example.invalid/wp-admin/post.php?post=112&action=edit,
+afwijkingen,DUBBEL,Voorbeeld DUBBEL,duplicate_sku,"16,17",116,https://nl.example.invalid/wp-admin/post.php?post=16&action=edit,https://de.example.invalid/wp-admin/post.php?post=116&action=edit,

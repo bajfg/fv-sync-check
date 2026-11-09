@@ -34,6 +34,8 @@ jobs:
           DE_SECRET: ${{ secrets.DE_SECRET }}
           NL_PRICES_INCLUDE_TAX: ${{ secrets.NL_PRICES_INCLUDE_TAX }}
           DE_PRICES_INCLUDE_TAX: ${{ secrets.DE_PRICES_INCLUDE_TAX }}
+          NL_VAT_RATE: ${{ secrets.NL_VAT_RATE }}
+          DE_VAT_RATE: ${{ secrets.DE_VAT_RATE }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}

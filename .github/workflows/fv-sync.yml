@@ -1,0 +1,39 @@
+name: FV sync NL-DE
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fv-sync
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Tests (zonder netwerk of secrets)
+        run: python -m unittest discover -s tests -v
+      - name: Vergelijken en mailen
+        run: python fv_sync.py
+        env:
+          NL_URL: ${{ secrets.NL_URL }}
+          NL_KEY: ${{ secrets.NL_KEY }}
+          NL_SECRET: ${{ secrets.NL_SECRET }}
+          DE_URL: ${{ secrets.DE_URL }}
+          DE_KEY: ${{ secrets.DE_KEY }}
+          DE_SECRET: ${{ secrets.DE_SECRET }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}

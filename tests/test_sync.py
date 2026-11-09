@@ -96,6 +96,24 @@ class ComparisonTest(unittest.TestCase):
         self.assertNotIn('<script>', sync.html_report(rows))
         self.assertIn("'=cmd()", sync.csv_report(rows))
 
+    def test_technical_errors_excluded_from_count_and_separate_section(self):
+        for field in ('api_error', 'data_error'):
+            with self.subTest(field=field):
+                rows = [sync.row(field, name='Technisch probleem', nl='HTTP 403')]
+                self.assertEqual(sync.discrepancy_count(rows), 0)
+                self.assertEqual(rows[0]['sectie'], 'Technische fouten')
+                msg = sync.message(rows, 'a@b.invalid', 'c@d.invalid', '2026-11-09')
+                self.assertEqual(str(msg['Subject']), 'FV sync NL↔DE – 2026-11-09 – CONTROLE MISLUKT')
+                for body in (sync.html_report(rows), msg.get_body(preferencelist=('plain',)).get_content()):
+                    self.assertIn('Technische fouten', body)
+                    self.assertIn('HTTP 403', body)
+                    self.assertNotIn('alles gelijk', body)
+                self.assertIn('Technische fouten', sync.csv_report(rows))
+                mixed = self.rows + rows
+                self.assertEqual(sync.discrepancy_count(mixed), 15)
+                self.assertIn('CONTROLE MISLUKT', sync.report_title(mixed))
+                self.assertIn('PRIJS', sync.html_report(mixed))
+
     def test_exception_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'exceptions.csv'
@@ -118,6 +136,8 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(self.client.pages('products'), [{'id': 1}, {'id': 2}])
         self.assertEqual(self.session.get.call_args.kwargs['params']['page'], 2)
         self.assertFalse(self.session.get.call_args.kwargs['allow_redirects'])
+        for call in self.session.get.call_args_list:
+            self.assertEqual(call.kwargs['headers']['User-Agent'], 'ForaVida-SyncCheck/1.0 (+https://www.foravida.nl)')
         self.assertGreaterEqual(self.sleep.call_count, 2)
         self.assertFalse(self.session.post.called)
         self.assertFalse(self.session.put.called)
@@ -127,6 +147,8 @@ class ApiTest(unittest.TestCase):
         self.session.get.side_effect = [response({}, 429, {'Retry-After': '5'}), response([])]
         self.assertEqual(self.client.pages('products'), [])
         self.sleep.assert_any_call(5.0)
+        for call in self.session.get.call_args_list:
+            self.assertEqual(call.kwargs['headers']['User-Agent'], sync.USER_AGENT)
 
     def test_http_and_transport_errors_sanitized(self):
         self.session.get.return_value = response({}, 403)
@@ -231,8 +253,13 @@ class ApiTest(unittest.TestCase):
             smtp.return_value.__enter__.return_value.send_message.side_effect = sent.append
             self.assertEqual(sync.main(), 2)
             self.assertIn('HTTP 503', (Path(tmp) / 'job.md').read_text(encoding='utf-8'))
+            summary = (Path(tmp) / 'job.md').read_text(encoding='utf-8')
+            self.assertIn('CONTROLE MISLUKT', summary)
+            self.assertIn('Technische fouten', summary)
+            self.assertNotIn('alles gelijk', summary)
             self.assertIn('HTTP 503', (Path(tmp) / 'fv-sync.csv').read_text(encoding='utf-8-sig'))
         self.assertEqual(len(sent), 1)
+        self.assertIn('CONTROLE MISLUKT', str(sent[0]['Subject']))
         self.assertIn('HTTP 503', sent[0].get_body(preferencelist=('plain',)).get_content())
         self.assertNotIn('ontbreekt', sent[0].get_body(preferencelist=('plain',)).get_content())
 

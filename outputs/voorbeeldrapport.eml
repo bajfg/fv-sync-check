@@ -3,22 +3,20 @@ Subject: FV sync =?utf-8?b?TkzihpRERSDigJMgMjAyNi0xMS0wOSDigJM=?= 15
 From: rapport@example.invalid
 To: ontvanger@example.invalid
 MIME-Version: 1.0
-Content-Type: multipart/mixed; boundary="===============3737723530397206683=="
+Content-Type: multipart/mixed; boundary="===============4976064116223369937=="
 
---===============3737723530397206683==
+--===============4976064116223369937==
 Content-Type: multipart/alternative;
- boundary="===============1999817179349667176=="
+ boundary="===============4156218303803932690=="
 
---===============1999817179349667176==
+--===============4156218303803932690==
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: quoted-printable
 
+afwijkingen
 ACTIEPRIJS | Voorbeeld ACTIEPRIJS | sale_price | NL: 96.80 | DE: 98.00 | http=
 s://nl.example.invalid/wp-admin/post.php?post=3D3&action=3Dedit | https://de.=
 example.invalid/wp-admin/post.php?post=3D103&action=3Dedit
-BEWUST | Voorbeeld BEWUST | regular_price | NL: 121.00 | DE: 130.00 | https:/=
-/nl.example.invalid/wp-admin/post.php?post=3D13&action=3Dedit | https://de.ex=
-ample.invalid/wp-admin/post.php?post=3D113&action=3Dedit
 LEEG-VS-NUL | Voorbeeld LEEG-VS-NUL | sale_price | NL: 0.00 | DE: leeg | http=
 s://nl.example.invalid/wp-admin/post.php?post=3D15&action=3Dedit | https://de=
 .example.invalid/wp-admin/post.php?post=3D115&action=3Dedit
@@ -53,15 +51,22 @@ p?post=3D107&action=3Dedit
 VARIABEL | Voorbeeld VARIABEL | variation_count | NL: 2 | DE: 1 | https://nl.=
 example.invalid/wp-admin/post.php?post=3D9&action=3Dedit | https://de.example=
 .invalid/wp-admin/post.php?post=3D109&action=3Dedit
- | Voorbeeld zonder SKU | missing_sku | NL: ID 12 | DE:  | https://nl.example=
-.invalid/wp-admin/post.php?post=3D12&action=3Dedit |=20
- | Voorbeeld zonder SKU | missing_sku | NL:  | DE: ID 112 |  | https://de.exa=
-mple.invalid/wp-admin/post.php?post=3D112&action=3Dedit
 DUBBEL | Voorbeeld DUBBEL | duplicate_sku | NL: 16,17 | DE: 116 | https://nl.=
 example.invalid/wp-admin/post.php?post=3D16&action=3Dedit | https://de.exampl=
 e.invalid/wp-admin/post.php?post=3D116&action=3Dedit
 
---===============1999817179349667176==
+zonder SKU
+ | Voorbeeld zonder SKU | missing_sku | NL: ID 12 | DE:  | https://nl.example=
+.invalid/wp-admin/post.php?post=3D12&action=3Dedit |=20
+ | Voorbeeld zonder SKU | missing_sku | NL:  | DE: ID 112 |  | https://de.exa=
+mple.invalid/wp-admin/post.php?post=3D112&action=3Dedit
+
+uitzonderingen
+BEWUST | Voorbeeld BEWUST | regular_price | NL: 121.00 | DE: 130.00 | https:/=
+/nl.example.invalid/wp-admin/post.php?post=3D13&action=3Dedit | https://de.ex=
+ample.invalid/wp-admin/post.php?post=3D113&action=3Dedit
+
+--===============4156218303803932690==
 Content-Type: text/html; charset="utf-8"
 Content-Transfer-Encoding: quoted-printable
 MIME-Version: 1.0
@@ -139,9 +144,9 @@ th></tr><tr><td>BEWUST</td><td>Voorbeeld BEWUST</td><td>regular_price</td><td=
 //de.example.invalid/wp-admin/post.php?post=3D113&amp;action=3Dedit">bewerken=
 </a></td><td>Lokale afspraak</td></tr></table></body></html>
 
---===============1999817179349667176==--
+--===============4156218303803932690==--
 
---===============3737723530397206683==
+--===============4976064116223369937==
 Content-Type: text/csv
 Content-Transfer-Encoding: base64
 Content-Disposition: attachment; filename="fv-sync-2026-11-09.csv"
@@ -202,4 +207,4 @@ TCxkdXBsaWNhdGVfc2t1LCIxNiwxNyIsMTE2LGh0dHBzOi8vbmwuZXhhbXBsZS5pbnZhbGlkL3dw
 LWFkbWluL3Bvc3QucGhwP3Bvc3Q9MTYmYWN0aW9uPWVkaXQsaHR0cHM6Ly9kZS5leGFtcGxlLmlu
 dmFsaWQvd3AtYWRtaW4vcG9zdC5waHA/cG9zdD0xMTYmYWN0aW9uPWVkaXQsDQo=
 
---===============3737723530397206683==--
+--===============4976064116223369937==--

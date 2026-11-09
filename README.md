@@ -25,7 +25,7 @@ Dagelijkse, uitsluitend lezende controle van de WooCommerce-shops foravida.nl en
 | `SMTP_PASS` | SMTP-wachtwoord of app-wachtwoord |
 | `MAIL_TO` | Ontvanger; meerdere adressen kommagescheiden |
 
-Alle toegang en afleveradressen komen uit deze secrets. De workflow injecteert ze als omgevingsvariabelen; het script bevat geen productie-URL's, sleutels of mailconfiguratie. Er wordt geen `.env` ingelezen. Gebruik geen secrets in commandoregels, screenshots of commits.
+Alle toegang en afleveradressen komen uit deze secrets. De workflow injecteert ze als omgevingsvariabelen; API-basis-URL's, sleutels en mailconfiguratie worden niet vastgelegd in de code. Alleen de publiek herkenbare contact-URL in de verplichte User-Agent staat vast. Er wordt geen `.env` ingelezen. Gebruik geen secrets in commandoregels, screenshots of commits.
 
 De zes shop-secrets zijn verplicht. De twee btw-terugvalwaarden zijn alleen nodig wanneer de instellingen-API 401/403 teruggeeft. Controleer de waarde in WooCommerce: `yes` betekent dat ingevoerde prijzen inclusief btw zijn, `no` dat ze exclusief btw zijn. De API-waarde heeft voorrang als uitlezen lukt.
 
@@ -47,6 +47,12 @@ Linux/macOS: gebruik `.venv/bin/python`. Lokaal echt uitvoeren kan met `python f
 ## Werking
 
 Alle WooCommerce-verzoeken zijn `GET /wp-json/wc/v3/...`. Er bestaan geen schrijf-, wijzig-, batch- of verwijderaanroepen. Authenticatie gebruikt HTTP Basic over geverifieerde HTTPS, zonder sleutels in URL's. Redirects worden geweigerd om onbedoeld doorgeven van toegang te voorkomen. Logregels bevatten endpoint, shoplabel en HTTP-status. Bij iedere niet-200-respons wordt ook een fragment van maximaal 300 tekens gelogd, inclusief bij iedere retry. Daardoor zijn Cloudflare-HTML en WooCommerce-JSON herkenbaar. Bekende sleutels en secrets, URL-/JSON-gecodeerde varianten en de Basic-authwaarde worden afgeschermd vóór het inkorten. Nieuwe regels worden als escapes weergegeven. Er worden geen authenticatieheaders gelogd. Bij netwerkfouten zonder respons bestaat geen body om te loggen. SMTP gebruikt geverifieerde TLS; onversleuteld verzenden is uitgesloten.
+
+Elk HTTP-verzoek, inclusief paginering, btw-instellingen, tarieven, variaties en retries, gebruikt exact deze header in plaats van de standaard `python-requests`-identificatie:
+
+```text
+User-Agent: ForaVida-SyncCheck/1.0 (+https://www.foravida.nl)
+```
 
 Het script leest:
 
@@ -87,19 +93,23 @@ Onderdrukte verschillen blijven zichtbaar in de sectie **uitzonderingen** en in 
 
 ## Rapport en fouten
 
-Onderwerp: `FV sync NL↔DE – [datum] – [n] afwijkingen`, met de datum in Europe/Amsterdam. `n` telt afwijkingsregels, geen unieke SKU's; afzonderlijke meldingen zonder SKU en technische fouten tellen mee.
+Onderwerp en titel in de Job Summary: `FV sync NL↔DE – [datum] – [n] afwijkingen`, met de datum in Europe/Amsterdam. `n` telt catalogusafwijkingsregels, geen unieke SKU's; afzonderlijke meldingen zonder SKU tellen mee. **`api_error` en `data_error` tellen nooit als afwijking.**
+
+Bij technische fouten, waaronder een shop die niet volledig kan worden uitgelezen, luidt de titel **`FV sync NL↔DE – [datum] – CONTROLE MISLUKT`**. Deze titel geldt ook als daarnaast catalogusverschillen zijn gevonden. Technische meldingen staan afzonderlijk onder **Technische fouten** in de HTML-mail, de platte tekstmail en de Job Summary. In de CSV krijgen ze de sectie `Technische fouten`; ze blijven dus beschikbaar in het artifact. Dezelfde afhandeling geldt voor onbetrouwbare prijsgegevens of een ongeldige configuratie (`data_error`).
 
 Het rapport begint met een tabel, gesorteerd op prijs, ontbrekend product, status/voorraad, actieperiode en aantal variaties. Daarna volgen producten zonder SKU en bewuste uitzonderingen. De tabel toont SKU, productnaam, veld, waarden NL/DE en beide beschikbare wp-admin-links. De CSV bevat **alle rapportregels**, inclusief uitzonderingen en fouten; UTF-8 met BOM voor Excel. Mogelijke spreadsheetformules worden als tekst beveiligd. Een volledig identieke catalogus levert een header-only CSV op. De optionele e-mail bevat dezelfde tabel, een platte tekstversie en de CSV als bijlage.
 
 Iedere run schrijft `outputs/fv-sync.csv` en `outputs/summary.md`, ook bij API- of SMTP-fouten. Met `--output-dir PAD` kies je lokaal een andere rapportmap. Binnen GitHub Actions wordt het rapport daarnaast altijd toegevoegd aan het bestand uit `$GITHUB_STEP_SUMMARY`, zodat het in de **Job Summary** staat. De workflow uploadt de CSV met `if: always()` als artifact **fv-sync-csv**, ook als het script met exitcode 1 of 2 eindigt. Bewaartermijn: 14 dagen. De Job Summary en het artifact volgen de toegangsrechten van de repository. Buiten Actions blijft de lokale summary beschikbaar. Een schrijffout is een technische fout; de andere rapportbestanden worden dan nog steeds geprobeerd. Bij een afgebroken job of infrastructuurfout voordat het script draait kan geen rapport worden gegarandeerd.
 
-Bij nul niet-uitgezonderde afwijkingen bevat de rapportinhoud precies de regel **alles gelijk**; eventuele bewuste verschillen staan dan alleen in de CSV. Bij een API-probleem bevat het rapport endpoint en HTTP-status. Bij DNS/TLS/time-out bestaat geen HTTP-status en staat er expliciet `geen HTTP-respons`. Een onvolledige shop wordt niet als lege catalogus vergeleken. API-fouten staan bovenaan. Een SMTP-storing wordt ook in Summary en CSV vermeld.
+Alleen bij nul niet-uitgezonderde afwijkingen **én zonder technische fouten** bevat de rapportinhoud precies de regel **alles gelijk**; eventuele bewuste verschillen staan dan alleen in de CSV. Bij een API-probleem bevat het rapport endpoint en HTTP-status. Bij DNS/TLS/time-out bestaat geen HTTP-status en staat er expliciet `geen HTTP-respons`. Een onvolledige shop wordt niet als lege catalogus vergeleken. Technische fouten krijgen een aparte sectie na de tabel met eventuele catalogusverschillen. Een SMTP-storing wordt ook in Summary en CSV vermeld.
 
 Exitcodes: **`0` = alles gelijk**, **`1` = afwijkingen gevonden**, **`2` = technische fout**. Technische fouten (API, ongeldige gegevens/configuratie, SMTP of schrijven van rapportbestanden) hebben voorrang op catalogusverschillen. Bewuste uitzonderingen tellen niet mee. Ontbrekende en dubbele SKU's tellen als catalogusafwijking. Zowel 1 als 2 maakt de Actions-stap rood; het CSV-artifact wordt daarna alsnog geüpload. Overgeslagen mail en een geslaagde btw-terugval veranderen de exitcode niet.
 
 ## Tests en voorbeeld
 
 `tests/fixtures/nl.json` en `tests/fixtures/de.json` zijn twee vaste, volledig fictieve datasets, met nep-URL's. De tests bewijzen alle gevraagde typen afwijkingen, inclusief variaties, bruto-omrekening, tolerantie, beide richtingen van ontbrekende producten, private/draft, lege actieprijs versus nul, ontbrekende/dubbele SKU, uitzonderingen, volgorde, e-mailbijlage en bewerklinks. Gesimuleerde HTTP-antwoorden controleren paginering, alleen GET, rate limiting, retries en API-foutmail zonder onterechte ontbrekende producten. Aanvullende tests dekken btw-terugval bij 401/403 voor beide landen en yes/no, API-voorrang, ongeldige terugvalwaarden, veilige HTML-/JSON-foutlogging, optionele mail, alle drie exitcodes en rapportbestanden bij technische fouten. Er worden tijdens tests geen echte shops of SMTP-servers benaderd.
+
+De tests controleren ook de exacte User-Agent bij paginering en retries, de titel `CONTROLE MISLUKT` in mail en Job Summary, de aparte sectie voor beide typen technische fouten en de afwijkingenteller bij gemengde catalogus- en technische meldingen.
 
 `python -m tests.example_report` maakt `outputs/voorbeeldrapport.html`, `.csv` en `.eml` uit precies die datasets. Het voorbeeld bevat 15 niet-uitgezonderde afwijkingsregels plus één bewuste uitzondering. Open de HTML in een browser of de EML in een mailprogramma.
 

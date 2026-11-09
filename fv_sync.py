@@ -23,6 +23,8 @@ from urllib.parse import urlsplit, quote, quote_plus
 import requests
 
 LOG = logging.getLogger("fv_sync")
+USER_AGENT = "ForaVida-SyncCheck/1.0 (+https://www.foravida.nl)"
+TECHNICAL_FIELDS = {"api_error", "data_error"}
 FIELDS = {"exists", "status", "regular_price", "sale_price", "date_on_sale_from",
           "date_on_sale_to", "stock_status", "variation_count"}
 PRIORITY = {"regular_price": 0, "sale_price": 0, "exists": 1, "status": 2,
@@ -81,7 +83,8 @@ class Client:
             self.last_request = time.monotonic()
             try:
                 response = self.session.get(self.base + "/wp-json/wc/v3/" + endpoint,
-                                            params=params, timeout=(10, 60), allow_redirects=False)
+                                            params=params, headers={"User-Agent": USER_AGENT},
+                                            timeout=(10, 60), allow_redirects=False)
             except requests.RequestException:
                 status_code = None
                 status = "geen HTTP-respons (netwerk/TLS/timeout)"
@@ -252,6 +255,8 @@ def exceptions_from(path):
 
 
 def row(field, sku="", name="", nl="", de="", nl_link="", de_link="", reason="", section="afwijkingen"):
+    if field in TECHNICAL_FIELDS:
+        section = "Technische fouten"
     return dict(zip(COLUMNS, [section, sku, name, field, str(nl), str(de), nl_link, de_link, reason]))
 
 
@@ -308,7 +313,16 @@ def compare(nl, de, exceptions=None):
 
 
 def discrepancy_count(rows):
-    return sum(r["sectie"] != "uitzonderingen" for r in rows)
+    return sum(r["sectie"] != "uitzonderingen" and r["veld"] not in TECHNICAL_FIELDS for r in rows)
+
+
+def has_technical_errors(rows):
+    return any(r["veld"] in TECHNICAL_FIELDS for r in rows)
+
+
+def report_title(rows, date=None):
+    status = "CONTROLE MISLUKT" if has_technical_errors(rows) else f"{discrepancy_count(rows)} afwijkingen"
+    return f"FV sync NL↔DE – {date or amsterdam_date()} – {status}"
 
 
 def csv_report(rows):
@@ -323,7 +337,7 @@ def csv_report(rows):
 
 
 def html_report(rows):
-    if not discrepancy_count(rows):
+    if not discrepancy_count(rows) and not has_technical_errors(rows):
         return "<html><body><p>alles gelijk</p></body></html>"
     def table(items):
         headers = ["SKU", "Productnaam", "Veld", "Waarde NL", "Waarde DE", "Bewerken NL", "Bewerken DE", "Reden"]
@@ -335,7 +349,11 @@ def html_report(rows):
                 result += f'<td><a href="{v}">bewerken</a></td>' if k.startswith("bewerken") and v else f"<td>{v}</td>"
             result += "</tr>"
         return result + "</table>"
-    body = table([r for r in rows if r["sectie"] == "afwijkingen"])
+    differences = [r for r in rows if r["sectie"] == "afwijkingen" and r["veld"] not in TECHNICAL_FIELDS]
+    body = table(differences) if differences else ""
+    technical = [r for r in rows if r["veld"] in TECHNICAL_FIELDS]
+    if technical:
+        body += "<h2>Technische fouten</h2>" + table(technical)
     for section in ("zonder SKU", "uitzonderingen"):
         items = [r for r in rows if r["sectie"] == section]
         if items:
@@ -355,12 +373,19 @@ def amsterdam_date():
 def message(rows, sender, recipient, date=None):
     date = date or amsterdam_date()
     msg = EmailMessage()
-    msg["Subject"] = f"FV sync NL↔DE – {date} – {discrepancy_count(rows)} afwijkingen"
+    msg["Subject"] = report_title(rows, date)
     msg["From"], msg["To"] = sender, recipient
-    if not discrepancy_count(rows):
+    if not discrepancy_count(rows) and not has_technical_errors(rows):
         text = "alles gelijk"
     else:
-        text = "\n".join(f"{r['SKU']} | {r['productnaam']} | {r['veld']} | NL: {r['waarde_NL']} | DE: {r['waarde_DE']} | {r['bewerken_NL']} | {r['bewerken_DE']}" for r in rows)
+        sections = []
+        for section in ("afwijkingen", "zonder SKU", "Technische fouten", "uitzonderingen"):
+            items = [r for r in rows if (r["veld"] in TECHNICAL_FIELDS if section == "Technische fouten"
+                     else r["sectie"] == section and r["veld"] not in TECHNICAL_FIELDS)]
+            if items:
+                sections.append(section + "\n" + "\n".join(
+                    f"{r['SKU']} | {r['productnaam']} | {r['veld']} | NL: {r['waarde_NL']} | DE: {r['waarde_DE']} | {r['bewerken_NL']} | {r['bewerken_DE']}" for r in items))
+        text = "\n\n".join(sections)
     msg.set_content(text)
     msg.add_alternative(html_report(rows), subtype="html")
     msg.add_attachment(("\ufeff" + csv_report(rows)).encode("utf-8"), maintype="text", subtype="csv",
@@ -377,7 +402,7 @@ def required(name):
 
 def save_report(rows, output_dir):
     """Attempt CSV, local summary and GitHub Summary independently, even on errors."""
-    summary = f"## FV sync NL↔DE – {amsterdam_date()} – {discrepancy_count(rows)} afwijkingen\n\n"
+    summary = f"## {report_title(rows)}\n\n"
     summary += html_report(rows).removeprefix("<html><body>").removesuffix("</body></html>") + "\n"
     directory = Path(output_dir)
     ok = True
@@ -422,7 +447,7 @@ def send_mail(rows):
             smtp.ehlo()
             smtp.login(user, password)
             smtp.send_message(msg)
-    LOG.info("Rapport verstuurd: %d afwijkingen", discrepancy_count(rows))
+    LOG.info("Rapport verstuurd: %s", report_title(rows))
 
 
 def main():
@@ -458,7 +483,7 @@ def main():
         LOG.error("Mail versturen mislukt; controleer SMTP-secrets en provider (details afgeschermd)")
         rows.insert(0, row("data_error", name="Mail versturen mislukt", nl="Controleer SMTP-configuratie/provider"))
     saved = save_report(rows, args.output_dir)
-    if not saved or any(r["veld"] in ("api_error", "data_error") for r in rows):
+    if not saved or has_technical_errors(rows):
         return 2
     return 1 if discrepancy_count(rows) else 0
 

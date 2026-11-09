@@ -140,35 +140,56 @@ class Shop:
     products: list
 
 
-def standard_rate(rates, country):
-    relevant = [r for r in rates if r.get("country") == country
-                and r.get("class", "standard") in ("", "standard")]
-    generic = [r for r in relevant if not any(r.get(k) for k in
-               ("state", "postcode", "city", "postcodes", "cities", "compound"))]
-    if len(generic) != 1 or len(relevant) != 1:
-        raise AuditError(f"{country}: geen eenduidig landelijk standaard-btw-tarief")
-    rate = Decimal(str(generic[0]["rate"]))
-    if not rate.is_finite() or rate < 0:
-        raise AuditError(f"{country}: ongeldig btw-tarief")
+def configured_vat_rate(country):
+    name = country + "_VAT_RATE"
+    raw = os.environ.get(name, "").strip() or {"NL": "21", "DE": "19"}[country]
+    try:
+        rate = Decimal(raw)
+        if not rate.is_finite() or rate < 0:
+            raise ValueError
+    except (InvalidOperation, ValueError):
+        raise AuditError(f"{name} moet een eindig, niet-negatief percentage zijn (decimale punt)") from None
     return rate
 
 
-def load_shop(client, country):
+def check_tax_configuration(client, country):
+    """Diagnostics only: API tax records never determine the comparison rate."""
+    try:
+        rates = client.pages("taxes", **{"class": "standard"})
+        relevant = [r for r in rates if r.get("country") == country
+                    and r.get("class", "standard") in ("", "standard")]
+        generic = [r for r in relevant if not any(r.get(k) for k in
+                   ("state", "postcode", "city", "postcodes", "cities", "compound"))]
+        if len(generic) != 1 or len(relevant) != 1:
+            LOG.warning("%s /taxes niet eenduidig; vergelijking gaat door met %s_VAT_RATE/default", country, country)
+    except (AuditError, ValueError, KeyError, TypeError, AttributeError):
+        LOG.warning("%s /taxes niet controleerbaar; vergelijking gaat door met %s_VAT_RATE/default", country, country)
+
+
+def prices_include_tax(client, country):
+    name = country + "_PRICES_INCLUDE_TAX"
+    value = os.environ.get(name, "").strip()
+    # Explicit configuration takes priority: yes/yes must always compare directly.
+    if value:
+        if value not in ("yes", "no"):
+            raise AuditError(f"{name} moet yes/no zijn")
+        LOG.info("%s: gebruik %s=%s", country, name, value)
+        return value == "yes"
     try:
         setting, _ = client.get("settings/tax/woocommerce_prices_include_tax")
     except AuditError as error:
-        if error.status_code not in (401, 403):
-            raise
-        name = country + "_PRICES_INCLUDE_TAX"
-        value = os.environ.get(name, "").strip()
-        if value not in ("yes", "no"):
-            raise AuditError(f"{country} settings/tax: HTTP {error.status_code}; {name} moet yes/no zijn") from None
-        LOG.warning("%s settings/tax HTTP %s: gebruik %s=%s", country, error.status_code, name, value)
-        setting = {"value": value}
+        if error.status_code in (401, 403):
+            raise AuditError(f"{country} settings/tax: HTTP {error.status_code}; stel {name} in op yes/no") from None
+        raise
     if not isinstance(setting, dict) or setting.get("value") not in ("yes", "no"):
         raise AuditError(f"{country}: woocommerce_prices_include_tax ontbreekt/is ongeldig")
-    rate = standard_rate(client.pages("taxes", **{"class": "standard"}), country)
-    # Never substitute 21/19 if access fails: use the actual shop setting.
+    return setting["value"] == "yes"
+
+
+def load_shop(client, country):
+    included = prices_include_tax(client, country)
+    rate = configured_vat_rate(country)
+    check_tax_configuration(client, country)
     products = client.pages("products", status="any", context="edit", orderby="id", order="asc")
     all_products = []
     for product in products:
@@ -189,7 +210,7 @@ def load_shop(client, country):
                     v["tax_status"] = product.get("tax_status", "taxable")
                 all_products.append(v)
         all_products.append(product)
-    return Shop(country, client.base, setting["value"] == "yes", rate, all_products)
+    return Shop(country, client.base, included, rate, all_products)
 
 
 def validate_product(product, country, variation=False):
@@ -210,9 +231,9 @@ def gross(product, field, shop):
     value = Decimal(str(raw))
     if not value.is_finite() or value < 0:
         raise ValueError("ongeldig prijsbedrag")
-    if product.get("tax_class", "") not in ("", "standard"):
-        raise ValueError("afwijkende belastingklasse; bruto niet betrouwbaar bepaalbaar")
     if not shop.includes_tax and product.get("tax_status", "taxable") == "taxable":
+        if product.get("tax_class", "") not in ("", "standard"):
+            raise ValueError("afwijkende belastingklasse; bruto niet betrouwbaar bepaalbaar")
         value *= 1 + shop.rate / 100
     return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 

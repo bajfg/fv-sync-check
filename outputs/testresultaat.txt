@@ -1,6 +1,6 @@
 Test uitgevoerd op 9 november 2026 met Python 3.12.10 en requests 2.32.5.
 Commando: .venv\Scripts\python -m unittest discover -s tests -v
-Resultaat: Ran 26 tests in 0.315s — OK
+Resultaat: Ran 30 tests in 0.374s — OK
 
 Alle gevraagde afwijkingstypen aangetoond met tests/fixtures/nl.json en de.json.
 Extra controles: bruto-btw, tolerantie, ontbrekende/dubbele SKU, uitzonderingen,
@@ -9,4 +9,7 @@ bewerklinks en CSV/e-mailinhoud. Nieuwe controles: btw-terugval bij 401/403,
 veilige HTTP-responsefragmenten, optionele mail, Job Summary, CSV bij technische
 fouten en exitcodes 0/1/2. Extra in v3: exacte User-Agent, aparte technische
 sectie, afwijkingenteller en CONTROLE MISLUKT in mail/Job Summary.
+Extra in v4: NL/DE_VAT_RATE met defaults en overrides, directe yes/yes-
+vergelijking, alle inclusieve/exclusieve combinaties en niet-blokkerende
+/taxes-waarschuwingen inclusief een volledige run met exitcode 0.
 Geen echte shop- of SMTP-aanroepen.

@@ -5,7 +5,7 @@ Dagelijkse, uitsluitend lezende controle van de WooCommerce-shops foravida.nl en
 ## Installatie en starten
 
 1. Zet de bestanden inclusief `.github/workflows/fv-sync.yml` op de standaardbranch van de GitHub-repository.
-2. Maak per shop een WooCommerce REST API-sleutel met **Read** als machtiging, via WooCommerce → Instellingen → Geavanceerd → REST API. Koppel de sleutel aan een gebruiker die producten, privéproducten, instellingen en belastingtarieven mag **lezen**. De REST API v3 moet op HTTPS bereikbaar zijn.
+2. Maak per shop een WooCommerce REST API-sleutel met **Read** als machtiging, via WooCommerce → Instellingen → Geavanceerd → REST API. Koppel de sleutel aan een gebruiker die producten en privéproducten mag **lezen**. Instellingen lezen is alleen nodig als je `PRICES_INCLUDE_TAX` niet expliciet instelt; toegang tot belastingtarieven is optioneel. De REST API v3 moet op HTTPS bereikbaar zijn.
 3. Voeg onderstaande repository secrets toe via GitHub → Settings → Secrets and variables → Actions → New repository secret.
 4. Schakel GitHub Actions in. Start de eerste controle via Actions → FV sync NL-DE → Run workflow. Bekijk de Job Summary en download het artifact `fv-sync-csv`. Als mail is ingesteld, ontvang je ook een e-mail.
 
@@ -17,8 +17,10 @@ Dagelijkse, uitsluitend lezende controle van de WooCommerce-shops foravida.nl en
 | `DE_URL` | HTTPS-basis-URL van de Duitse WordPress-installatie |
 | `DE_KEY` | Duitse consumer key, alleen lezen |
 | `DE_SECRET` | Duitse consumer secret |
-| `NL_PRICES_INCLUDE_TAX` | Terugval voor Nederlandse btw-instelling: exact `yes` of `no`; alleen gebruikt bij HTTP 401/403 op `settings/tax/woocommerce_prices_include_tax` |
-| `DE_PRICES_INCLUDE_TAX` | Dezelfde terugval voor Duitsland: exact `yes` of `no` |
+| `NL_PRICES_INCLUDE_TAX` | Nederlandse prijsinvoer: exact `yes` of `no`; heeft voorrang op de instellingen-API |
+| `DE_PRICES_INCLUDE_TAX` | Duitse prijsinvoer: exact `yes` of `no`; heeft voorrang op de instellingen-API |
+| `NL_VAT_RATE` | Percentage voor Nederlandse netto→bruto-omrekening; standaard `21` als leeg/niet ingesteld |
+| `DE_VAT_RATE` | Percentage voor Duitse netto→bruto-omrekening; standaard `19` als leeg/niet ingesteld |
 | `SMTP_HOST` | SMTP-server |
 | `SMTP_PORT` | `465` voor impliciete TLS, anders een STARTTLS-poort zoals `587` |
 | `SMTP_USER` | SMTP-gebruikersnaam; tevens afzenderadres, dus een geldig toegestaan e-mailadres |
@@ -27,7 +29,7 @@ Dagelijkse, uitsluitend lezende controle van de WooCommerce-shops foravida.nl en
 
 Alle toegang en afleveradressen komen uit deze secrets. De workflow injecteert ze als omgevingsvariabelen; API-basis-URL's, sleutels en mailconfiguratie worden niet vastgelegd in de code. Alleen de publiek herkenbare contact-URL in de verplichte User-Agent staat vast. Er wordt geen `.env` ingelezen. Gebruik geen secrets in commandoregels, screenshots of commits.
 
-De zes shop-secrets zijn verplicht. De twee btw-terugvalwaarden zijn alleen nodig wanneer de instellingen-API 401/403 teruggeeft. Controleer de waarde in WooCommerce: `yes` betekent dat ingevoerde prijzen inclusief btw zijn, `no` dat ze exclusief btw zijn. De API-waarde heeft voorrang als uitlezen lukt.
+De zes shop-secrets zijn verplicht. Stel bij voorkeur beide `PRICES_INCLUDE_TAX`-waarden expliciet in op basis van WooCommerce: `yes` betekent dat ingevoerde prijzen inclusief btw zijn, `no` dat ze exclusief btw zijn. Een ingestelde waarde heeft voorrang; het instellingen-endpoint wordt dan overgeslagen, zodat een 401/403 daar niet blokkeert. Alleen bij een lege/niet-ingestelde waarde leest het script de instelling uit de API. `NL_VAT_RATE` en `DE_VAT_RATE` zijn optioneel en worden via GitHub Secrets als omgevingsvariabelen doorgegeven. Gebruik een percentage zonder procentteken, met eventueel een decimale punt, bijvoorbeeld `21` of `7.5`. Ongeldige, negatieve of niet-eindige waarden geven een configuratiefout.
 
 **Mail is optioneel.** Alleen als `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` én `MAIL_TO` allemaal niet-leeg zijn, probeert het script te mailen. Een ontbrekende of gedeeltelijke mailconfiguratie wordt gelogd als overgeslagen en is geen technische fout. Een volledig ingevulde maar ongeldige configuratie of een mislukte verzending is wel een technische fout.
 
@@ -42,7 +44,7 @@ python -m venv .venv
 .\.venv\Scripts\python -m tests.example_report
 ```
 
-Linux/macOS: gebruik `.venv/bin/python`. Lokaal echt uitvoeren kan met `python fv_sync.py` nadat de shop-omgevingsvariabelen en eventuele btw-terugvalwaarden via een veilige secretvoorziening zijn gezet. Mailvariabelen zijn optioneel. GitHub Secrets zijn buiten Actions niet automatisch beschikbaar. Er is geen automatische configuratie van je GitHub-account vanuit dit script.
+Linux/macOS: gebruik `.venv/bin/python`. Lokaal echt uitvoeren kan met `python fv_sync.py` nadat de shop-omgevingsvariabelen en eventuele btw-invoerinstellingen via een veilige secretvoorziening zijn gezet. Mailvariabelen en afwijkende btw-percentages zijn optioneel. GitHub Secrets zijn buiten Actions niet automatisch beschikbaar. Er is geen automatische configuratie van je GitHub-account vanuit dit script.
 
 ## Werking
 
@@ -56,8 +58,8 @@ User-Agent: ForaVida-SyncCheck/1.0 (+https://www.foravida.nl)
 
 Het script leest:
 
-- `settings/tax/woocommerce_prices_include_tax`;
-- `taxes?class=standard`, inclusief paginering;
+- `settings/tax/woocommerce_prices_include_tax`, alleen zonder expliciete omgevingswaarde;
+- `taxes?class=standard`, inclusief paginering, uitsluitend voor een niet-blokkerende controle;
 - alle producten met `status=any&context=edit`, inclusief draft en private;
 - alle variaties van elk variabel product met `status=any&context=edit`, eveneens gepagineerd.
 
@@ -69,13 +71,17 @@ Per SKU worden bestaan (`exists`), `status`, `regular_price`, `sale_price`, `sto
 
 ## Prijzen en btw
 
-Het standaardtarief komt daadwerkelijk uit de API: normaal NL 21% en DE 19%, zonder hardcoded terugval. Bij `woocommerce_prices_include_tax=no` geldt voor belastbare producten: `bruto = ingevoerde prijs × (1 + tarief / 100)`. Bij `yes` blijft de ingevoerde prijs staan. Niet-belastbare producten (`tax_status=none` of `shipping`) krijgen geen product-btw toegevoegd. Voor variaties wordt belastingklasse `parent` opgelost naar de ouder.
+Het tarief voor de vergelijking komt uitsluitend uit `NL_VAT_RATE` (standaard **21**) en `DE_VAT_RATE` (standaard **19**). Lege waarden gebruiken ook deze standaardpercentages. Er wordt nooit een percentage uit `/taxes` voor de berekening gebruikt.
+
+Staan `NL_PRICES_INCLUDE_TAX` en `DE_PRICES_INCLUDE_TAX` beide op **`yes`**, dan worden `regular_price` en `sale_price` rechtstreeks als brutobedragen vergeleken, zonder omrekening. Dit werkt ook voor producten met een afwijkende belastingklasse, omdat geen btw hoeft te worden berekend. Alleen bij een shop met prijsinvoer **`no`** worden belastbare bedragen omgerekend: `bruto = ingevoerde prijs × (1 + ingesteld percentage / 100)`. Bij een mix van yes/no wordt dus alleen de exclusieve kant omgerekend; bij no/no ieder met het eigen percentage. Niet-belastbare producten (`tax_status=none` of `shipping`) krijgen geen product-btw toegevoegd. Voor variaties wordt belastingklasse `parent` opgelost naar de ouder.
 
 Bedragen worden met `Decimal` op eurocenten afgerond (`ROUND_HALF_UP`); pas bij een verschil **groter dan €0,01** volgt een melding. Lege prijs en nul zijn verschillend. Zowel gewone prijs als actieprijs wordt gecontroleerd, ook buiten de actieperiode. De vergelijking veronderstelt dat beide shops europrijzen leveren.
 
-Het script accepteert alleen één eenduidig landelijk standaardtarief per land. Lokale, samengestelde of meerdere standaardtarieven geven een expliciete fout in plaats van een gok. Een product met een afwijkende belastingklasse en ingevulde prijs geeft `data_error`; hiervoor is aanvullende belastinglogica nodig. De huidige opdracht betreft het standaardtarief. Sale-datums worden waar beschikbaar via de corresponderende `_gmt`-velden als UTC vergeleken; anders via het lokale ISO-veld. Gelijke lokale tijden veronderstellen dan gelijke shoptijdzones.
+`/taxes` wordt alleen als controle uitgelezen. Geen, meerdere, lokale of samengestelde standaardtarieven geven een **waarschuwing in de log**; de vergelijking gaat door met de geconfigureerde percentages. Ook een onbereikbaar of niet-toegankelijk `/taxes`-endpoint of een ongeldige respons blokkeert niet. Deze waarschuwingen leveren geen `api_error`/`data_error` op, tellen niet mee en veroorzaken geen titel `CONTROLE MISLUKT` of exitcode 2.
 
-**Toegang tot instellingen:** een Read-sleutel geeft niet automatisch de WordPress-gebruiker de bevoegdheid om instellingen en tarieven te bekijken. Bij HTTP 401/403 op de btw-instelling gebruikt het script `NL_PRICES_INCLUDE_TAX` respectievelijk `DE_PRICES_INCLUDE_TAX` en gaat verder met tarieven en producten. Deze succesvolle terugval geeft een waarschuwing in de log en is geen technische fout of catalogusafwijking. Ontbreekt een geldige `yes/no`-waarde, dan volgt een expliciete technische melding. Andere HTTP-fouten en ongeldige API-inhoud activeren de terugval niet. Het standaardtarief moet nog steeds via `taxes` leesbaar zijn; voor dit endpoint is er geen terugval. Geef de sleutel geen schrijfrechten.
+Als voor een belastbaar product met een afwijkende belastingklasse een netto→bruto-omrekening nodig is, blijft `data_error` van toepassing: daarvoor is aanvullende belastinglogica nodig. Bij reeds inclusieve bedragen is de belastingklasse geen blokkade. Sale-datums worden waar beschikbaar via de corresponderende `_gmt`-velden als UTC vergeleken; anders via het lokale ISO-veld. Gelijke lokale tijden veronderstellen dan gelijke shoptijdzones.
+
+**Toegang tot instellingen:** een Read-sleutel geeft niet automatisch de WordPress-gebruiker de bevoegdheid om instellingen en tarieven te bekijken. Met expliciete `PRICES_INCLUDE_TAX`-waarden is toegang tot het instellingen-endpoint niet nodig. Als zo'n waarde ontbreekt en het endpoint 401/403 teruggeeft, meldt het script welke omgevingsvariabele moet worden ingesteld. Andere fouten op dat benodigde instellingen-endpoint blijven technisch; `/taxes` is in alle gevallen niet-blokkerend. Geef de sleutel geen schrijfrechten.
 
 ## Bewuste uitzonderingen
 
@@ -103,11 +109,11 @@ Iedere run schrijft `outputs/fv-sync.csv` en `outputs/summary.md`, ook bij API- 
 
 Alleen bij nul niet-uitgezonderde afwijkingen **én zonder technische fouten** bevat de rapportinhoud precies de regel **alles gelijk**; eventuele bewuste verschillen staan dan alleen in de CSV. Bij een API-probleem bevat het rapport endpoint en HTTP-status. Bij DNS/TLS/time-out bestaat geen HTTP-status en staat er expliciet `geen HTTP-respons`. Een onvolledige shop wordt niet als lege catalogus vergeleken. Technische fouten krijgen een aparte sectie na de tabel met eventuele catalogusverschillen. Een SMTP-storing wordt ook in Summary en CSV vermeld.
 
-Exitcodes: **`0` = alles gelijk**, **`1` = afwijkingen gevonden**, **`2` = technische fout**. Technische fouten (API, ongeldige gegevens/configuratie, SMTP of schrijven van rapportbestanden) hebben voorrang op catalogusverschillen. Bewuste uitzonderingen tellen niet mee. Ontbrekende en dubbele SKU's tellen als catalogusafwijking. Zowel 1 als 2 maakt de Actions-stap rood; het CSV-artifact wordt daarna alsnog geüpload. Overgeslagen mail en een geslaagde btw-terugval veranderen de exitcode niet.
+Exitcodes: **`0` = alles gelijk**, **`1` = afwijkingen gevonden**, **`2` = technische fout**. Technische fouten (benodigde API-data, ongeldige gegevens/configuratie, SMTP of schrijven van rapportbestanden) hebben voorrang op catalogusverschillen. Bewuste uitzonderingen tellen niet mee. Ontbrekende en dubbele SKU's tellen als catalogusafwijking. Zowel 1 als 2 maakt de Actions-stap rood; het CSV-artifact wordt daarna alsnog geüpload. Overgeslagen mail en waarschuwingen over `/taxes` veranderen de exitcode niet.
 
 ## Tests en voorbeeld
 
-`tests/fixtures/nl.json` en `tests/fixtures/de.json` zijn twee vaste, volledig fictieve datasets, met nep-URL's. De tests bewijzen alle gevraagde typen afwijkingen, inclusief variaties, bruto-omrekening, tolerantie, beide richtingen van ontbrekende producten, private/draft, lege actieprijs versus nul, ontbrekende/dubbele SKU, uitzonderingen, volgorde, e-mailbijlage en bewerklinks. Gesimuleerde HTTP-antwoorden controleren paginering, alleen GET, rate limiting, retries en API-foutmail zonder onterechte ontbrekende producten. Aanvullende tests dekken btw-terugval bij 401/403 voor beide landen en yes/no, API-voorrang, ongeldige terugvalwaarden, veilige HTML-/JSON-foutlogging, optionele mail, alle drie exitcodes en rapportbestanden bij technische fouten. Er worden tijdens tests geen echte shops of SMTP-servers benaderd.
+`tests/fixtures/nl.json` en `tests/fixtures/de.json` zijn twee vaste, volledig fictieve datasets, met nep-URL's. De tests bewijzen alle gevraagde typen afwijkingen, inclusief variaties, bruto-omrekening, tolerantie, beide richtingen van ontbrekende producten, private/draft, lege actieprijs versus nul, ontbrekende/dubbele SKU, uitzonderingen, volgorde, e-mailbijlage en bewerklinks. Gesimuleerde HTTP-antwoorden controleren paginering, alleen GET, rate limiting, retries en API-foutmail zonder onterechte ontbrekende producten. Aanvullende tests dekken expliciete btw-invoerinstellingen, API-uitlezing zonder expliciete waarde, vaste/configureerbare btw-percentages, alle vier yes/no-combinaties voor beide prijsvelden en doorgaan met vergelijken bij onduidelijke of onbereikbare `/taxes`-gegevens. Ook veilige HTML-/JSON-foutlogging, optionele mail, alle drie exitcodes en rapportbestanden bij technische fouten worden getest. Er worden tijdens tests geen echte shops of SMTP-servers benaderd.
 
 De tests controleren ook de exacte User-Agent bij paginering en retries, de titel `CONTROLE MISLUKT` in mail en Job Summary, de aparte sectie voor beide typen technische fouten en de afwijkingenteller bij gemengde catalogus- en technische meldingen.
 

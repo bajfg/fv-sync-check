@@ -1,4 +1,3 @@
-import copy
 import base64
 import json
 import os
@@ -65,6 +64,31 @@ class ComparisonTest(unittest.TestCase):
         self.de.products[0]['regular_price'] = '121.01'
         self.assertEqual(sync.compare(self.nl, self.de), [])
 
+    def test_all_tax_inclusion_combinations_use_configured_rates_only(self):
+        cases = [('yes', 'yes', '121', '121'), ('no', 'yes', '100', '121'),
+                 ('yes', 'no', '119', '100'), ('no', 'no', '119', '121')]
+        for nl_included, de_included, nl_price, de_price in cases:
+            with self.subTest(nl=nl_included, de=de_included), patch.dict(os.environ, {
+                'NL_PRICES_INCLUDE_TAX': nl_included, 'DE_PRICES_INCLUDE_TAX': de_included,
+                'NL_VAT_RATE': '21', 'DE_VAT_RATE': '19',
+            }):
+                shops = []
+                for country, source, price in [('NL', self.nl, nl_price), ('DE', self.de, de_price)]:
+                    p = dict(source.products[0], type='simple', regular_price=price,
+                             sale_price=str(Decimal(price) / 2))
+                    fake = Mock(base=source.base)
+                    # Deliberately incorrect API rate: must never enter arithmetic.
+                    fake.pages.side_effect = [[{'country': country, 'rate': '99'}], [p]]
+                    shops.append(sync.load_shop(fake, country))
+                    fake.get.assert_not_called()
+                self.assertEqual(sync.compare(*shops), [])
+
+    def test_inclusive_prices_do_not_require_standard_tax_class(self):
+        self.nl.includes_tax = self.de.includes_tax = True
+        p = dict(self.nl.products[0], tax_class='reduced-rate', sale_price='80')
+        self.nl.products, self.de.products = [p], [dict(p)]
+        self.assertEqual(sync.compare(self.nl, self.de), [])
+
     def test_private_status_and_dates_utc(self):
         a = dict(self.nl.products[0], date_on_sale_from='2026-11-10T00:00:00',
                  date_on_sale_from_gmt='2026-11-09T23:00:00')
@@ -129,6 +153,8 @@ class ApiTest(unittest.TestCase):
         self.session = Mock()
         self.client = sync.Client('NL', 'https://shop.example.invalid', 'fake-key', 'fake-secret', self.session)
         self.sleep = patch('fv_sync.time.sleep').start()
+        patch.dict(os.environ, {'NL_VAT_RATE': '', 'DE_VAT_RATE': '',
+                               'NL_PRICES_INCLUDE_TAX': '', 'DE_PRICES_INCLUDE_TAX': ''}).start()
         self.addCleanup(patch.stopall)
 
     def test_pagination_and_get_only(self):
@@ -172,17 +198,49 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(shop.products[0]['tax_class'], '')
         self.assertEqual(fake.pages.call_args.kwargs['status'], 'any')
 
-    def test_ambiguous_tax_fails_closed(self):
-        rates = [{'country': 'NL', 'rate': '21', 'class': 'standard'}]
-        self.assertEqual(sync.standard_rate(rates, 'NL'), Decimal('21'))
-        with self.assertRaises(sync.AuditError):
-            sync.standard_rate(rates + copy.deepcopy(rates), 'NL')
+    def test_ambiguous_or_unavailable_tax_is_warning_and_products_still_load(self):
+        tax_cases = [[], [{'country': 'NL', 'rate': '21'}] * 2,
+                     [{'country': 'NL', 'rate': '21', 'cities': ['Amsterdam']}],
+                     [{'country': 'NL', 'compound': True}], [None],
+                     sync.AuditError('NL taxes: HTTP 403', status_code=403),
+                     sync.AuditError('NL taxes: HTTP 503', status_code=503),
+                     sync.AuditError('NL taxes: geen HTTP-respons')]
+        for taxes in tax_cases:
+            with self.subTest(taxes=taxes):
+                fake = Mock(base='https://nl.example.invalid')
+                fake.get.return_value = ({'value': 'no'}, {})
+                p = dict(fixture('nl').products[0], type='simple')
+                fake.pages.side_effect = [taxes, [p]]
+                with self.assertLogs('fv_sync', level='WARNING') as logged:
+                    shop = sync.load_shop(fake, 'NL')
+                self.assertIn('/taxes', '\n'.join(logged.output))
+                self.assertIn('gaat door', '\n'.join(logged.output))
+                self.assertEqual(shop.rate, Decimal('21'))
+                self.assertEqual(len(shop.products), 1)
+                self.assertEqual(sync.compare(shop, shop), [])
+
+    def test_vat_rate_defaults_overrides_and_validation(self):
+        self.assertEqual(sync.configured_vat_rate('NL'), Decimal('21'))
+        self.assertEqual(sync.configured_vat_rate('DE'), Decimal('19'))
+        with patch.dict(os.environ, {'NL_VAT_RATE': '9', 'DE_VAT_RATE': '7.5'}):
+            self.assertEqual(sync.configured_vat_rate('NL'), Decimal('9'))
+            self.assertEqual(sync.configured_vat_rate('DE'), Decimal('7.5'))
+            fake = Mock(base='https://nl.example.invalid')
+            fake.get.return_value = ({'value': 'no'}, {})
+            fake.pages.side_effect = [[{'country': 'NL', 'rate': '21'}], []]
+            shop = sync.load_shop(fake, 'NL')
+            self.assertEqual(shop.rate, Decimal('9'))
+            self.assertEqual(sync.gross(fixture('nl').products[0], 'regular_price', shop), Decimal('109.00'))
+        for raw in ('-1', 'NaN', 'Infinity', 'abc', '21,5'):
+            with self.subTest(raw=raw), patch.dict(os.environ, {'NL_VAT_RATE': raw}):
+                with self.assertRaisesRegex(sync.AuditError, 'NL_VAT_RATE'):
+                    sync.configured_vat_rate('NL')
 
     def test_incomplete_product_is_not_reported_as_equal(self):
         with self.assertRaisesRegex(sync.AuditError, 'HTTP 200, onvolledig'):
             sync.validate_product({'id': 1, 'sku': 'X'}, 'NL')
 
-    def test_tax_fallback_401_403_for_both_countries(self):
+    def test_explicit_tax_configuration_avoids_forbidden_settings(self):
         for country in ('NL', 'DE'):
             for status in (401, 403):
                 for value in ('yes', 'no'):
@@ -194,10 +252,11 @@ class ApiTest(unittest.TestCase):
                         shop = sync.load_shop(fake, country)
                         self.assertEqual(shop.includes_tax, value == 'yes')
                         self.assertEqual(fake.pages.call_count, 2)
+                        fake.get.assert_not_called()
 
-    def test_tax_fallback_not_used_on_other_errors_or_api_success(self):
+    def test_settings_api_used_only_when_no_explicit_value(self):
         fake = Mock(base='https://shop.example.invalid')
-        with patch.dict(os.environ, {'NL_PRICES_INCLUDE_TAX': 'no'}):
+        with patch.dict(os.environ, {'NL_PRICES_INCLUDE_TAX': ''}):
             for status in (404, 429, 500, None):
                 fake.get.side_effect = sync.AuditError('failed', status_code=status)
                 with self.assertRaises(sync.AuditError):
@@ -207,13 +266,23 @@ class ApiTest(unittest.TestCase):
             fake.pages.side_effect = [[{'country': 'NL', 'rate': '21'}], []]
             self.assertTrue(sync.load_shop(fake, 'NL').includes_tax)
 
-    def test_tax_fallback_requires_explicit_yes_no(self):
-        for value in ('', 'true', 'YES'):
+        with patch.dict(os.environ, {'NL_PRICES_INCLUDE_TAX': 'no'}):
+            fake.get.reset_mock()
+            fake.pages.side_effect = [[{'country': 'NL', 'rate': '21'}], []]
+            self.assertFalse(sync.load_shop(fake, 'NL').includes_tax)
+            fake.get.assert_not_called()
+
+    def test_tax_configuration_requires_explicit_yes_no(self):
+        for value in ('true', 'YES'):
             with patch.dict(os.environ, {'NL_PRICES_INCLUDE_TAX': value}):
                 fake = Mock()
                 fake.get.side_effect = sync.AuditError('forbidden', status_code=403)
-                with self.assertRaisesRegex(sync.AuditError, 'HTTP 403; NL_PRICES_INCLUDE_TAX moet yes/no'):
+                with self.assertRaisesRegex(sync.AuditError, 'NL_PRICES_INCLUDE_TAX moet yes/no'):
                     sync.load_shop(fake, 'NL')
+        fake = Mock()
+        fake.get.side_effect = sync.AuditError('forbidden', status_code=403)
+        with self.assertRaisesRegex(sync.AuditError, 'HTTP 403; stel NL_PRICES_INCLUDE_TAX in'):
+            sync.load_shop(fake, 'NL')
 
     def test_http_body_html_json_and_each_retry_logged_safely(self):
         auth = base64.b64encode(b'fake-key:fake-secret').decode()
@@ -265,6 +334,25 @@ class ApiTest(unittest.TestCase):
 
 
 class ReportingTest(unittest.TestCase):
+    def test_tax_warning_does_not_fail_control_or_create_technical_section(self):
+        clients = []
+        for label in ('nl', 'de'):
+            fake = Mock(base=fixture(label).base)
+            p = dict(fixture(label).products[0], type='simple', regular_price='121')
+            fake.pages.side_effect = [[], [p]]  # No unambiguous rate from /taxes.
+            clients.append(fake)
+        env = dict(NL_URL='https://nl.example.invalid', DE_URL='https://de.example.invalid',
+                   NL_KEY='fake', NL_SECRET='fake', DE_KEY='fake', DE_SECRET='fake',
+                   NL_PRICES_INCLUDE_TAX='yes', DE_PRICES_INCLUDE_TAX='yes')
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, env, clear=True), \
+             patch('sys.argv', ['fv_sync.py', '--output-dir', tmp]), \
+             patch('fv_sync.Client', side_effect=clients), self.assertLogs('fv_sync', level='WARNING'):
+            self.assertEqual(sync.main(), 0)
+            summary = (Path(tmp) / 'summary.md').read_text(encoding='utf-8')
+            self.assertIn('alles gelijk', summary)
+            self.assertNotIn('CONTROLE MISLUKT', summary)
+            self.assertNotIn('Technische fouten', summary)
+
     def run_main(self, shops, env=None, mail_error=None):
         credentials = {key: 'fake' for key in ('NL_KEY', 'NL_SECRET', 'DE_KEY', 'DE_SECRET')}
         credentials.update(NL_URL='https://nl.example.invalid', DE_URL='https://de.example.invalid')
